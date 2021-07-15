@@ -110,10 +110,17 @@ where
     }
 
     fn poll_shutdown(
-        self: Pin<&mut Self>,
-        _cx: &mut Context,
+        mut self: Pin<&mut Self>,
+        cx: &mut Context,
     ) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
+        // send a close frame
+        ready!(Pin::new(&mut self.io)
+            .poll_ready(cx)
+            .map_err(|e| utils::new_io_err(&e.to_string())))?;
+        let _ = Pin::new(&mut self.io).start_send(Message::Close(None));
+        Pin::new(&mut self.io)
+            .poll_close(cx)
+            .map_err(|e| utils::new_io_err(&e.to_string()))
     }
 }
 
