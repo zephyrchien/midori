@@ -1,18 +1,22 @@
 use std::io;
 use std::sync::Arc;
+use std::net::SocketAddr;
 use futures::try_join;
 
-use tokio::io::{AsyncRead, AsyncWrite};
-
 use super::copy;
-use crate::transport::plain::{self, PlainStream};
+use crate::transport::plain::{self, PlainStream, PlainListener};
 use crate::transport::{AsyncConnect, AsyncAccept};
 
-async fn bidi_copy<S, C>(sin: S, conn: Arc<C>) -> io::Result<()>
+async fn bidi_copy<S, C>(
+    res: (PlainStream, SocketAddr),
+    lis: Arc<S>,
+    conn: Arc<C>,
+) -> io::Result<()>
 where
-    S: AsyncRead + AsyncWrite + Unpin,
+    S: AsyncAccept,
     C: AsyncConnect,
 {
+    let (sin, _) = lis.accept(res).await?;
     let sout = conn.connect().await?;
     let (ri, wi) = tokio::io::split(sin);
     let (ro, wo) = tokio::io::split(sout);
@@ -25,10 +29,12 @@ where
     L: AsyncAccept + 'static,
     C: AsyncConnect + 'static,
 {
+    let lis = Arc::new(lis);
     let conn = Arc::new(conn);
+    let plain_lis = PlainListener::bind(lis.addr()).unwrap();
     loop {
-        if let Ok((sin, _)) = lis.accept().await {
-            tokio::spawn(bidi_copy(sin, conn.clone()));
+        if let Ok(res) = plain_lis.accept_plain().await {
+            tokio::spawn(bidi_copy(res, lis.clone(), conn.clone()));
         }
     }
 }
@@ -59,8 +65,9 @@ pub async fn splice(
     lis: plain::Acceptor,
     conn: plain::Connector,
 ) -> io::Result<()> {
+    let plain_lis = PlainListener::bind(lis.addr()).unwrap();
     loop {
-        if let Ok((sin, _)) = lis.accept().await {
+        if let Ok((sin, _)) = plain_lis.accept_plain().await {
             tokio::spawn(bidi_zero_copy(sin, conn.clone()));
         }
     }

@@ -18,7 +18,8 @@ use tungstenite::handshake::server::{Callback, Request, Response, ErrorResponse}
 use async_trait::async_trait;
 
 use super::{AsyncConnect, AsyncAccept, IOStream};
-use crate::utils;
+use super::plain::PlainStream;
+use crate::utils::{self, CommonAddr};
 
 pub struct WSStream<S> {
     io: WebSocketStream<S>,
@@ -135,7 +136,6 @@ impl<T: AsyncConnect> Connector<T> {
 
 #[async_trait]
 impl<T: AsyncConnect> AsyncConnect for Connector<T> {
-    //const is_zero_copy:bool = false;
     type IO = WSStream<T::IO>;
 
     async fn connect(&self) -> io::Result<Self::IO> {
@@ -195,11 +195,15 @@ impl Callback for RequestHook {
 
 #[async_trait]
 impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
-    //const is_zero_copy:bool = false;
     type IO = WSStream<T::IO>;
 
-    async fn accept(&self) -> io::Result<(Self::IO, SocketAddr)> {
-        let (stream, addr) = self.lis.accept().await?;
+    fn addr(&self) -> &CommonAddr { self.lis.addr() }
+
+    async fn accept(
+        &self,
+        res: (PlainStream, SocketAddr),
+    ) -> io::Result<(Self::IO, SocketAddr)> {
+        let (stream, addr) = self.lis.accept(res).await?;
         let hook = RequestHook {
             path: self.path.clone(),
         };

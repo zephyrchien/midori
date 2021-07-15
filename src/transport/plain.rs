@@ -160,7 +160,6 @@ impl Connector {
 
 #[async_trait]
 impl AsyncConnect for Connector {
-    //const is_zero_copy:bool = true;
     type IO = PlainStream;
 
     async fn connect(&self) -> io::Result<Self::IO> {
@@ -203,22 +202,8 @@ impl PlainListener {
             _ => unreachable!(),
         })
     }
-}
-
-pub struct Acceptor {
-    lis: PlainListener,
-}
-
-impl Acceptor {
-    pub fn new(lis: PlainListener) -> Self { Acceptor { lis } }
-}
-
-#[async_trait]
-impl AsyncAccept for Acceptor {
-    //const is_zero_copy:bool = true;
-    type IO = PlainStream;
-    async fn accept(&self) -> io::Result<(Self::IO, SocketAddr)> {
-        Ok(match &self.lis {
+    pub async fn accept_plain(&self) -> io::Result<(PlainStream, SocketAddr)> {
+        Ok(match self {
             PlainListener::TCP(x) => {
                 let (stream, sockaddr) = x.accept().await?;
                 stream.set_nodelay(true)?;
@@ -232,5 +217,28 @@ impl AsyncAccept for Acceptor {
                 (PlainStream::UDS(stream), sockaddr)
             }
         })
+    }
+}
+
+pub struct Acceptor {
+    addr: CommonAddr,
+}
+
+impl Acceptor {
+    pub fn new(addr: CommonAddr) -> Self { Acceptor { addr } }
+}
+
+#[async_trait]
+impl AsyncAccept for Acceptor {
+    type IO = PlainStream;
+
+    fn addr(&self) -> &CommonAddr { &self.addr }
+
+    async fn accept(
+        &self,
+        res: (PlainStream, SocketAddr),
+    ) -> io::Result<(Self::IO, SocketAddr)> {
+        // fake accept
+        Ok(res)
     }
 }

@@ -65,14 +65,12 @@ fn new_plain_lis(addr: &str, net: &NetConfig) -> plain::Acceptor {
     match net {
         NetConfig::TCP => {
             let sockaddr = parse_socket_addr(addr, false).unwrap();
-            let lis = plain::PlainListener::bind(&sockaddr).unwrap();
-            plain::Acceptor::new(lis)
+            plain::Acceptor::new(sockaddr)
         }
         #[cfg(unix)]
         NetConfig::UDS => {
             let path = CommonAddr::UnixSocketPath(PathBuf::from(addr));
-            let lis = plain::PlainListener::bind(&path).unwrap();
-            plain::Acceptor::new(lis)
+            plain::Acceptor::new(path)
         }
         NetConfig::UDP => unreachable!(),
     }
@@ -84,7 +82,7 @@ fn meet_zero_copy(
 ) -> bool {
     if let TransportConfig::Plain = lis_trans {
         if let TransportConfig::Plain = conn_trans {
-            return true;
+            return false;
         }
     }
     false
