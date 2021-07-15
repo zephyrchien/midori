@@ -82,7 +82,7 @@ fn meet_zero_copy(
 ) -> bool {
     if let TransportConfig::Plain = lis_trans {
         if let TransportConfig::Plain = conn_trans {
-            return false;
+            return true;
         }
     }
     false
