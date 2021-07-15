@@ -52,6 +52,7 @@ fn new_plain_conn(addr: &str, net: &NetConfig) -> plain::Connector {
             let sockaddr = parse_socket_addr(addr, true).unwrap();
             plain::Connector::new(sockaddr)
         }
+        #[cfg(unix)]
         NetConfig::UDS => {
             let path = CommonAddr::UnixSocketPath(PathBuf::from(addr));
             plain::Connector::new(path)
@@ -67,6 +68,7 @@ fn new_plain_lis(addr: &str, net: &NetConfig) -> plain::Acceptor {
             let lis = plain::PlainListener::bind(&sockaddr).unwrap();
             plain::Acceptor::new(lis)
         }
+        #[cfg(unix)]
         NetConfig::UDS => {
             let path = CommonAddr::UnixSocketPath(PathBuf::from(addr));
             let lis = plain::PlainListener::bind(&path).unwrap();
@@ -139,6 +141,7 @@ pub async fn run(eps: Vec<EndpointConfig>) {
     for ep in eps.into_iter() {
         let plain_lis = new_plain_lis(&ep.listen.addr, &ep.listen.net);
         let plain_conn = new_plain_conn(&ep.remote.addr, &ep.remote.net);
+        #[cfg(target_os = "linux")]
         if meet_zero_copy(&ep.listen.trans, &ep.remote.trans) {
             workers.push(tokio::spawn(stream::splice(plain_lis, plain_conn)));
             continue;

@@ -6,6 +6,7 @@ use std::net::SocketAddr;
 pub enum CommonAddr {
     SocketAddr(SocketAddr),
     DomainName(String, u16),
+    #[cfg(unix)]
     UnixSocketPath(PathBuf),
 }
 
@@ -14,6 +15,7 @@ impl Display for CommonAddr {
         match self {
             Self::SocketAddr(sockaddr) => write!(f, "{}", sockaddr),
             Self::DomainName(addr, port) => write!(f, "{}:{}", addr, port),
+            #[cfg(unix)]
             Self::UnixSocketPath(path) => write!(f, "{}", path.display()),
         }
     }

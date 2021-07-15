@@ -5,5 +5,6 @@ use serde::{Serialize, Deserialize};
 pub enum NetConfig {
     TCP,
     UDP,
+    #[cfg(unix)]
     UDS,
 }

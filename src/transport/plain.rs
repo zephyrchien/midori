@@ -2,19 +2,24 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
-use std::os::unix::io::{AsRawFd, RawFd};
 use futures::executor::block_on;
 
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::net::{TcpStream, TcpListener, UnixStream, UnixListener};
+use tokio::net::{TcpStream, TcpListener};
 use async_trait::async_trait;
 
 use super::{AsyncConnect, AsyncAccept, IOStream};
 use crate::dns;
 use crate::utils::{self, CommonAddr};
 
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, RawFd};
+#[cfg(unix)]
+use tokio::net::{UnixStream, UnixListener};
+
 pub enum PlainStream {
     TCP(TcpStream),
+    #[cfg(unix)]
     UDS(UnixStream),
 }
 
@@ -24,10 +29,12 @@ pub struct WriteHalf<'a>(&'a PlainStream);
 
 impl IOStream for PlainStream {}
 
+#[cfg(unix)]
 impl AsRawFd for PlainStream {
     fn as_raw_fd(&self) -> RawFd {
         match self {
             Self::TCP(x) => x.as_raw_fd(),
+            #[cfg(unix)]
             Self::UDS(x) => x.as_raw_fd(),
         }
     }
@@ -45,6 +52,7 @@ impl PlainStream {
     pub fn set_no_delay(&self, nodelay: bool) -> io::Result<()> {
         match self {
             Self::TCP(x) => x.set_nodelay(nodelay),
+            #[cfg(unix)]
             _ => Ok(()),
         }
     }
@@ -61,6 +69,7 @@ impl AsyncRead for PlainStream {
     ) -> Poll<io::Result<()>> {
         match &mut self.get_mut() {
             Self::TCP(x) => Pin::new(x).poll_read(cx, buf),
+            #[cfg(unix)]
             Self::UDS(x) => Pin::new(x).poll_read(cx, buf),
         }
     }
@@ -85,6 +94,7 @@ impl AsyncWrite for PlainStream {
     ) -> Poll<Result<usize, io::Error>> {
         match &mut self.get_mut() {
             Self::TCP(x) => Pin::new(x).poll_write(cx, buf),
+            #[cfg(unix)]
             Self::UDS(x) => Pin::new(x).poll_write(cx, buf),
         }
     }
@@ -95,6 +105,7 @@ impl AsyncWrite for PlainStream {
     ) -> Poll<Result<(), io::Error>> {
         match &mut self.get_mut() {
             Self::TCP(x) => Pin::new(x).poll_flush(cx),
+            #[cfg(unix)]
             Self::UDS(x) => Pin::new(x).poll_flush(cx),
         }
     }
@@ -105,6 +116,7 @@ impl AsyncWrite for PlainStream {
     ) -> Poll<Result<(), io::Error>> {
         match &mut self.get_mut() {
             Self::TCP(x) => Pin::new(x).poll_shutdown(cx),
+            #[cfg(unix)]
             Self::UDS(x) => Pin::new(x).poll_shutdown(cx),
         }
     }
@@ -161,6 +173,7 @@ impl AsyncConnect for Connector {
             CommonAddr::SocketAddr(sockaddr) => {
                 PlainStream::TCP(TcpStream::connect(sockaddr).await?)
             }
+            #[cfg(unix)]
             CommonAddr::UnixSocketPath(path) => {
                 PlainStream::UDS(UnixStream::connect(path).await?)
             }
@@ -173,6 +186,7 @@ impl AsyncConnect for Connector {
 // Plain Acceptor
 pub enum PlainListener {
     TCP(TcpListener),
+    #[cfg(unix)]
     UDS(UnixListener),
 }
 
@@ -182,6 +196,7 @@ impl PlainListener {
             CommonAddr::SocketAddr(sockaddr) => {
                 PlainListener::TCP(block_on(TcpListener::bind(sockaddr))?)
             }
+            #[cfg(unix)]
             CommonAddr::UnixSocketPath(path) => {
                 PlainListener::UDS(UnixListener::bind(path)?)
             }
@@ -209,6 +224,7 @@ impl AsyncAccept for Acceptor {
                 stream.set_nodelay(true)?;
                 (PlainStream::TCP(stream), sockaddr)
             }
+            #[cfg(unix)]
             PlainListener::UDS(x) => {
                 let (stream, _) = x.accept().await?;
                 let sockaddr =
