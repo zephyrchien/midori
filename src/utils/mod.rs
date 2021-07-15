@@ -11,6 +11,7 @@ pub fn new_io_err(e: &str) -> io::Error {
     io::Error::new(io::ErrorKind::Other, e)
 }
 
+#[allow(clippy::mut_from_ref)]
 pub unsafe fn const_cast<T>(x: &T) -> &mut T {
     let const_ptr = x as *const T;
     let mut_ptr = const_ptr as *mut T;

@@ -56,7 +56,7 @@ impl PlainStream {
             _ => Ok(()),
         }
     }
-    pub fn split<'a>(&'a mut self) -> (ReadHalf<'a>, WriteHalf<'a>) {
+    pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
         (ReadHalf(&*self), WriteHalf(&*self))
     }
 }
