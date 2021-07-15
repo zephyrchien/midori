@@ -11,7 +11,7 @@ pub enum CmdInput {
 
 pub fn scan() -> CmdInput {
     let matches = App::new("Midori")
-        .version("0.1.0")
+        .version("0.1.1")
         .about("A multi-protocol network relay")
         .author("zephyr <i@zephyr.moe>")
         .arg(
