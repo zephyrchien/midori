@@ -6,7 +6,7 @@ use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 
 use crate::utils::{self, PIPE_BUF_SIZE};
 
-pub struct Pipe(pub i32, pub i32);
+pub struct Pipe(i32, i32);
 
 impl Drop for Pipe {
     fn drop(&mut self) {

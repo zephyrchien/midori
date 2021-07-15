@@ -59,9 +59,8 @@ where
         Poll::Ready(ready!(Pin::new(&mut self.io).poll_next(cx)).map_or(
             Err(utils::new_io_err("broken pipe")),
             |item| {
-                item.map_or(
-                    Err(utils::new_io_err("broken pipe")),
-                    |m| match m {
+                item.map_or(Err(utils::new_io_err("broken pipe")), |msg| {
+                    match msg {
                         Message::Binary(data) => {
                             let to_read = min(buf.remaining(), data.len());
                             buf.put_slice(&data[..to_read]);
@@ -72,8 +71,8 @@ where
                         }
                         Message::Close(_) => Ok(()),
                         _ => Err(utils::new_io_err("invalid frame")),
-                    },
-                )
+                    }
+                })
             },
         ))
     }
