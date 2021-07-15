@@ -88,7 +88,7 @@ fn meet_zero_copy(
     false
 }
 
-async fn spawn_lis_haf_with_trans<L, C>(
+fn spawn_lis_half_with_trans<L, C>(
     workers: &mut Vec<JoinHandle<io::Result<()>>>,
     lis_trans: &TransportConfig,
     conn_trans: &TransportConfig,
@@ -100,18 +100,18 @@ async fn spawn_lis_haf_with_trans<L, C>(
 {
     match lis_trans {
         TransportConfig::Plain => {
-            spawn_conn_haf_with_trans(workers, conn_trans, lis, conn).await;
+            spawn_conn_half_with_trans(workers, conn_trans, lis, conn);
         }
         TransportConfig::WS(lisc) => {
             let lis = <WebSocketConfig as WithTransport<L, C>>::apply_to_lis(
                 lisc, lis,
             );
-            spawn_conn_haf_with_trans(workers, conn_trans, lis, conn).await;
+            spawn_conn_half_with_trans(workers, conn_trans, lis, conn);
         }
     }
 }
 
-async fn spawn_conn_haf_with_trans<L, C>(
+fn spawn_conn_half_with_trans<L, C>(
     workers: &mut Vec<JoinHandle<io::Result<()>>>,
     conn_trans: &TransportConfig,
     lis: L,
@@ -144,14 +144,13 @@ pub async fn run(eps: Vec<EndpointConfig>) {
             workers.push(tokio::spawn(stream::splice(plain_lis, plain_conn)));
             continue;
         }
-        spawn_lis_haf_with_trans(
+        spawn_lis_half_with_trans(
             &mut workers,
             &ep.listen.trans,
             &ep.remote.trans,
             plain_lis,
             plain_conn,
         )
-        .await;
     }
     join_all(workers).await;
 }
