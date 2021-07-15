@@ -1,11 +1,12 @@
 mod cmd;
+mod dns;
 mod relay;
 mod utils;
 mod config;
+mod transport;
 
 use cmd::CmdInput;
 use config::GlobalConfig;
-use relay::Endpoint;
 
 fn main() {
     match cmd::scan() {
@@ -17,19 +18,10 @@ fn main() {
 
 fn start_from_config(c: String) {
     let config = GlobalConfig::from_config_file(&c);
-    relay::init_resolver(config.dns_mode.to_strategy());
-    let eps: Vec<Endpoint> = config
-        .endpoints
-        .into_iter()
-        .map(|epc| epc.into_endpoint())
-        .collect();
-    run_relay(eps);
-}
-
-fn run_relay(eps: Vec<Endpoint>) {
+    dns::init_resolver(config.dns_mode.into_strategy());
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
-        .block_on(relay::run(eps))
+        .block_on(relay::run(config.endpoints))
 }

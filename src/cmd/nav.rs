@@ -1,3 +1,1 @@
-pub fn run_navigator() {
-    todo!()
-}
+pub fn run_navigator() { todo!() }

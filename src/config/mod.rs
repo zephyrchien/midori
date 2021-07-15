@@ -1,11 +1,15 @@
 use std::fs;
-
 use serde::{Serialize, Deserialize};
 
-mod dns_mode;
-mod endpoint_config;
-pub use dns_mode::DnsMode;
-pub use endpoint_config::EndpointConfig;
+mod dns;
+mod ep;
+mod net;
+mod trans;
+
+pub use dns::DnsMode;
+pub use net::NetConfig;
+pub use trans::{WithTransport, TransportConfig, WebSocketConfig};
+pub use ep::EndpointConfig;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GlobalConfig {

@@ -8,7 +8,7 @@ use tokio::net::UdpSocket;
 use tokio::sync::oneshot;
 use tokio::time::sleep;
 
-use super::types::RemoteAddr;
+use crate::utils::RemoteAddr;
 
 type Record = HashMap<SocketAddr, (Arc<UdpSocket>, oneshot::Sender<()>)>;
 const BUFFERSIZE: usize = 2048;
