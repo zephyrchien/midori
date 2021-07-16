@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 
-use crate::transport::{plain, ws};
+use super::WithTransport;
+use crate::transport::ws;
 use crate::transport::{AsyncConnect, AsyncAccept};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -13,18 +14,6 @@ pub enum TransportConfig {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WebSocketConfig {
     pub path: String,
-}
-
-pub trait WithTransport<L = plain::Acceptor, C = plain::Connector>
-where
-    L: AsyncAccept,
-    C: AsyncConnect,
-{
-    type Acceptor: AsyncAccept;
-    type Connector: AsyncConnect;
-
-    fn apply_to_lis(&self, lis: L) -> Self::Acceptor;
-    fn apply_to_conn(&self, conn: C) -> Self::Connector;
 }
 
 impl<L, C> WithTransport<L, C> for WebSocketConfig

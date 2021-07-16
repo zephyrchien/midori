@@ -6,6 +6,7 @@ use crate::utils::CommonAddr;
 
 pub mod plain;
 pub mod ws;
+pub mod tls;
 use plain::PlainStream;
 
 trait IOStream: AsyncRead + AsyncWrite + Send + Sync + Unpin {}

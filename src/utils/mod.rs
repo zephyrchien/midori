@@ -2,8 +2,10 @@ use std::io;
 
 mod types;
 mod consts;
+mod cert;
+pub use consts::*;
 pub use types::CommonAddr;
-pub use consts::BUF_SIZE;
+pub use cert::{load_certs, load_keys, generate_cert_key};
 #[cfg(target_os = "linux")]
 pub use consts::PIPE_BUF_SIZE;
 

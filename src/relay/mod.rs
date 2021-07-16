@@ -9,6 +9,7 @@ use crate::dns;
 use crate::utils::{self, CommonAddr};
 use crate::config::{
     EndpointConfig, NetConfig, WithTransport, TransportConfig, WebSocketConfig,
+    TLSConfig,
 };
 use crate::transport::plain;
 use crate::transport::{AsyncConnect, AsyncAccept};
@@ -86,35 +87,13 @@ fn meet_zero_copy(
     )
 }
 
-fn spawn_lis_half_with_trans<L, C>(
-    workers: &mut Vec<JoinHandle<io::Result<()>>>,
-    lis_trans: &TransportConfig,
-    conn_trans: &TransportConfig,
-    lis: L,
-    conn: C,
-) where
-    L: AsyncAccept + 'static,
-    C: AsyncConnect + 'static,
-{
-    match lis_trans {
-        TransportConfig::Plain => {
-            spawn_conn_half_with_trans(workers, conn_trans, lis, conn);
-        }
-        TransportConfig::WS(lisc) => {
-            let lis = <WebSocketConfig as WithTransport<L, C>>::apply_to_lis(
-                lisc, lis,
-            );
-            spawn_conn_half_with_trans(workers, conn_trans, lis, conn);
-        }
-    }
-}
-
 fn spawn_conn_half_with_trans<L, C>(
     workers: &mut Vec<JoinHandle<io::Result<()>>>,
     conn_trans: &TransportConfig,
     lis: L,
     conn: C,
-) where
+) -> ()
+where
     L: AsyncAccept + 'static,
     C: AsyncConnect + 'static,
 {
@@ -131,6 +110,73 @@ fn spawn_conn_half_with_trans<L, C>(
     }
 }
 
+fn spawn_lis_half_with_trans<L, C>(
+    workers: &mut Vec<JoinHandle<io::Result<()>>>,
+    lis_trans: &TransportConfig,
+    conn_trans: &TransportConfig,
+    lis: L,
+    conn: C,
+) -> ()
+where
+    L: AsyncAccept + 'static,
+    C: AsyncConnect + 'static,
+{
+    match lis_trans {
+        TransportConfig::Plain => {
+            spawn_conn_half_with_trans(workers, conn_trans, lis, conn);
+        }
+        TransportConfig::WS(lisc) => {
+            let lis = <WebSocketConfig as WithTransport<L, C>>::apply_to_lis(
+                lisc, lis,
+            );
+            spawn_conn_half_with_trans(workers, conn_trans, lis, conn);
+        }
+    }
+}
+
+fn spawn_with_tls(
+    workers: &mut Vec<JoinHandle<io::Result<()>>>,
+    ep: &EndpointConfig,
+    lis: plain::Acceptor,
+    conn: plain::Connector,
+) -> () {
+    match &ep.listen.tls {
+        TLSConfig::Server(lisc) => match &ep.remote.tls {
+            TLSConfig::Client(connc) => spawn_lis_half_with_trans(
+                workers,
+                &ep.listen.trans,
+                &ep.remote.trans,
+                lisc.apply_to_lis(lis),
+                connc.apply_to_conn(conn),
+            ),
+            _ => spawn_lis_half_with_trans(
+                workers,
+                &ep.listen.trans,
+                &ep.remote.trans,
+                lisc.apply_to_lis(lis),
+                conn,
+            ),
+        },
+        _ => match &ep.remote.tls {
+            TLSConfig::Client(connc) => spawn_lis_half_with_trans(
+                workers,
+                &ep.listen.trans,
+                &ep.remote.trans,
+                lis,
+                connc.apply_to_conn(conn),
+            ),
+
+            _ => spawn_lis_half_with_trans(
+                workers,
+                &ep.listen.trans,
+                &ep.remote.trans,
+                lis,
+                conn,
+            ),
+        },
+    }
+}
+
 pub async fn run(eps: Vec<EndpointConfig>) {
     let mut workers: Vec<JoinHandle<io::Result<()>>> =
         Vec::with_capacity(eps.len());
@@ -142,13 +188,7 @@ pub async fn run(eps: Vec<EndpointConfig>) {
             workers.push(tokio::spawn(stream::splice(plain_lis, plain_conn)));
             continue;
         }
-        spawn_lis_half_with_trans(
-            &mut workers,
-            &ep.listen.trans,
-            &ep.remote.trans,
-            plain_lis,
-            plain_conn,
-        )
+        spawn_with_tls(&mut workers, &ep, plain_lis, plain_conn);
     }
     join_all(workers).await;
 }
