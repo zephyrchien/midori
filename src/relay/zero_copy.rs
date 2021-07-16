@@ -30,6 +30,7 @@ impl Pipe {
     }
 }
 
+#[inline]
 pub fn splice_n(r: i32, w: i32, n: usize) -> isize {
     use libc::{loff_t, SPLICE_F_MOVE, SPLICE_F_NONBLOCK};
     unsafe {
@@ -44,6 +45,7 @@ pub fn splice_n(r: i32, w: i32, n: usize) -> isize {
     }
 }
 
+#[inline]
 pub fn is_wouldblock() -> bool {
     use libc::{EAGAIN, EWOULDBLOCK};
     let errno = unsafe { *libc::__errno_location() };

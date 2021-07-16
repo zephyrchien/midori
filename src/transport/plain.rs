@@ -56,12 +56,14 @@ impl PlainStream {
             _ => Ok(()),
         }
     }
+
     pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
         (ReadHalf(&*self), WriteHalf(&*self))
     }
 }
 
 impl AsyncRead for PlainStream {
+    #[inline]
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -76,6 +78,7 @@ impl AsyncRead for PlainStream {
 }
 
 impl AsyncRead for ReadHalf<'_> {
+    #[inline]
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -87,6 +90,7 @@ impl AsyncRead for ReadHalf<'_> {
 }
 
 impl AsyncWrite for PlainStream {
+    #[inline]
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -99,6 +103,7 @@ impl AsyncWrite for PlainStream {
         }
     }
 
+    #[inline]
     fn poll_flush(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -110,6 +115,7 @@ impl AsyncWrite for PlainStream {
         }
     }
 
+    #[inline]
     fn poll_shutdown(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -123,6 +129,7 @@ impl AsyncWrite for PlainStream {
 }
 
 impl AsyncWrite for WriteHalf<'_> {
+    #[inline]
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -132,6 +139,7 @@ impl AsyncWrite for WriteHalf<'_> {
             .poll_write(cx, buf)
     }
 
+    #[inline]
     fn poll_flush(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -139,6 +147,7 @@ impl AsyncWrite for WriteHalf<'_> {
         Pin::new(unsafe { utils::const_cast(self.get_mut().0) }).poll_flush(cx)
     }
 
+    #[inline]
     fn poll_shutdown(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -220,6 +229,7 @@ impl PlainListener {
     }
 }
 
+#[derive(Clone)]
 pub struct Acceptor {
     addr: CommonAddr,
 }

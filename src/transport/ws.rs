@@ -44,6 +44,7 @@ impl<S> AsyncRead for WSStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
+    #[inline]
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -82,6 +83,7 @@ impl<S> AsyncWrite for WSStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
+    #[inline]
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context,
@@ -99,6 +101,7 @@ where
         Poll::Ready(Ok(buf.len()))
     }
 
+    #[inline]
     fn poll_flush(
         mut self: Pin<&mut Self>,
         cx: &mut Context,
@@ -108,6 +111,7 @@ where
             .map_err(|_| utils::new_io_err("broken_pipe"))
     }
 
+    #[inline]
     fn poll_shutdown(
         mut self: Pin<&mut Self>,
         cx: &mut Context,
@@ -124,6 +128,7 @@ where
 }
 
 // WebSocket Connector
+#[derive(Clone)]
 pub struct Connector<T: AsyncConnect> {
     cc: T,
     req: String,
@@ -163,6 +168,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
 }
 
 // WebSocket Acceptor
+#[derive(Clone)]
 pub struct Acceptor<T: AsyncAccept> {
     lis: T,
     path: String,
@@ -184,6 +190,7 @@ struct RequestHook {
 }
 
 impl Callback for RequestHook {
+    #[inline]
     fn on_request(
         self,
         request: &Request,

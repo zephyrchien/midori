@@ -11,13 +11,13 @@ use plain::PlainStream;
 trait IOStream: AsyncRead + AsyncWrite + Send + Sync + Unpin {}
 
 #[async_trait]
-pub trait AsyncConnect: Send + Sync + Unpin {
+pub trait AsyncConnect: Send + Sync + Unpin + Clone {
     type IO: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static;
     async fn connect(&self) -> io::Result<Self::IO>;
 }
 
 #[async_trait]
-pub trait AsyncAccept: Send + Sync + Unpin {
+pub trait AsyncAccept: Send + Sync + Unpin + Clone {
     type IO: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static;
     fn addr(&self) -> &CommonAddr;
     async fn accept(

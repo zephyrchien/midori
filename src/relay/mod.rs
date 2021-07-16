@@ -80,10 +80,10 @@ fn meet_zero_copy(
     lis_trans: &TransportConfig,
     conn_trans: &TransportConfig,
 ) -> bool {
-    match (lis_trans, conn_trans) {
-        (TransportConfig::Plain, TransportConfig::Plain) => true,
-        _ => false,
-    }
+    matches!(
+        (lis_trans, conn_trans),
+        (TransportConfig::Plain, TransportConfig::Plain)
+    )
 }
 
 fn spawn_lis_half_with_trans<L, C>(

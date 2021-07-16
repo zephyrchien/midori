@@ -1,5 +1,4 @@
 use std::io;
-use std::sync::Arc;
 use std::net::SocketAddr;
 use futures::try_join;
 
@@ -9,8 +8,8 @@ use crate::transport::{AsyncConnect, AsyncAccept};
 
 async fn bidi_copy<S, C>(
     res: (PlainStream, SocketAddr),
-    lis: Arc<S>,
-    conn: Arc<C>,
+    lis: S,
+    conn: C,
 ) -> io::Result<()>
 where
     S: AsyncAccept,
@@ -29,8 +28,6 @@ where
     L: AsyncAccept + 'static,
     C: AsyncConnect + 'static,
 {
-    let lis = Arc::new(lis);
-    let conn = Arc::new(conn);
     let plain_lis = PlainListener::bind(lis.addr()).unwrap();
     loop {
         if let Ok(res) = plain_lis.accept_plain().await {
