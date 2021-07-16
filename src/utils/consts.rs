@@ -5,6 +5,7 @@ use rustls::RootCertStore;
 pub const BUF_SIZE: usize = 0x4000;
 pub const PIPE_BUF_SIZE: usize = 0x10000;
 pub const OCSP_BUF_SIZE: usize = 0x400;
+pub const NOT_A_DNS_NAME: &str = "localhost";
 
 lazy_static! {
     pub static ref NATIVE_CERTS: RootCertStore =

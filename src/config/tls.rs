@@ -6,7 +6,7 @@ use webpki::DNSNameRef;
 use rustls::{ClientConfig, ServerConfig, NoClientAuth};
 use rustls::internal::msgs::enums::ProtocolVersion;
 
-use crate::utils::{self, NATIVE_CERTS};
+use crate::utils::{self, NATIVE_CERTS, NOT_A_DNS_NAME};
 use crate::transport::tls;
 use crate::transport::{AsyncConnect, AsyncAccept};
 
@@ -109,10 +109,22 @@ fn make_client_config(config: &TLSClientConfig) -> ClientConfig {
 
 impl TLSClientConfig {
     pub fn apply_to_conn<C: AsyncConnect>(&self, conn: C) -> impl AsyncConnect {
-        let sni = DNSNameRef::try_from_ascii_str(&self.sni)
-            .unwrap()
-            .to_owned();
-        let config = make_client_config(self);
+        let mut config = make_client_config(self);
+        let sni = DNSNameRef::try_from_ascii_str(&{
+            if !self.sni.is_empty() {
+                self.sni.clone()
+            } else {
+                let s = conn.addr().to_dns_name();
+                if s.is_empty() {
+                    config.enable_sni = false;
+                    String::from(NOT_A_DNS_NAME)
+                } else {
+                    s
+                }
+            }
+        })
+        .unwrap()
+        .to_owned();
         tls::Connector::new(conn, sni, config)
     }
 }

@@ -12,7 +12,7 @@ pub use tokio_rustls::server::TlsStream as ServerTLSStream;
 
 use super::{AsyncConnect, AsyncAccept};
 use super::plain::PlainStream;
-use crate::utils;
+use crate::utils::{self, CommonAddr};
 
 #[derive(Clone)]
 pub struct Connector<T: AsyncConnect> {
@@ -35,6 +35,9 @@ impl<T: AsyncConnect> Connector<T> {
 #[async_trait]
 impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     type IO = ClientTLSStream<T::IO>;
+
+    fn addr(&self) -> &CommonAddr { self.cc.addr() }
+
     async fn connect(&self) -> io::Result<Self::IO> {
         let stream = self.cc.connect().await?;
         self.tls.connect(self.sni.as_ref(), stream).await

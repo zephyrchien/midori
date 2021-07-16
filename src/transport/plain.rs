@@ -171,6 +171,8 @@ impl Connector {
 impl AsyncConnect for Connector {
     type IO = PlainStream;
 
+    fn addr(&self) -> &CommonAddr { &self.addr }
+
     async fn connect(&self) -> io::Result<Self::IO> {
         let stream = match &self.addr {
             CommonAddr::DomainName(addr, port) => {

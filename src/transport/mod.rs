@@ -14,6 +14,7 @@ trait IOStream: AsyncRead + AsyncWrite + Send + Sync + Unpin {}
 #[async_trait]
 pub trait AsyncConnect: Send + Sync + Unpin + Clone {
     type IO: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static;
+    fn addr(&self) -> &CommonAddr;
     async fn connect(&self) -> io::Result<Self::IO>;
 }
 

@@ -21,30 +21,11 @@ impl Display for CommonAddr {
     }
 }
 
-/*
 impl CommonAddr {
-    pub async fn to_sockaddr(&self) -> io::Result<SocketAddr> {
+    pub fn to_dns_name(&self) -> String {
         match self {
-            Self::SocketAddr(sockaddr) => Ok(*sockaddr),
-            Self::DomainName(addr, port) => {
-                let ip = dns::resolve_async(addr).await?;
-                Ok(SocketAddr::new(ip, *port))
-            }
-            _ => unreachable!(),
+            CommonAddr::DomainName(addr, _) => addr.clone(),
+            _ => String::new(),
         }
     }
 }
-
-pub struct Endpoint<L: AsyncAccept, C: AsyncConnect> {
-    pub lis: L,
-    pub conn: C,
-}
-
-impl<L, C> Endpoint<L, C>
-where
-    L: AsyncAccept,
-    C: AsyncConnect,
-{
-    fn new(lis: L, conn: C) -> Self { Endpoint { lis, conn } }
-}
-*/

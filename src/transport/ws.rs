@@ -149,6 +149,8 @@ impl<T: AsyncConnect> Connector<T> {
 impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     type IO = WSStream<T::IO>;
 
+    fn addr(&self) -> &CommonAddr { self.cc.addr() }
+
     async fn connect(&self) -> io::Result<Self::IO> {
         let stream = self.cc.connect().await?;
         tokio_tungstenite::client_async_with_config(
