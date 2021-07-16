@@ -26,19 +26,33 @@ pub fn load_certs(path: &str) -> io::Result<Vec<Certificate>> {
 }
 
 pub fn load_keys(path: &str) -> io::Result<Vec<PrivateKey>> {
-    let mut fp = BufReader::new(File::open(path)?);
-    if let Ok(key) = pemfile::pkcs8_private_keys(&mut fp) {
-        return Ok(key);
+    if let Ok(key) =
+        pemfile::pkcs8_private_keys(&mut BufReader::new(File::open(path)?))
+    {
+        if key.len() != 0 {
+            return Ok(key);
+        }
     }
-    if let Ok(key) = ec_private_keys(&mut fp) {
-        return Ok(key);
-    }
-    if let Ok(key) = pemfile::rsa_private_keys(&mut fp) {
-        return Ok(key);
+    if let Ok(key) =
+        pemfile::rsa_private_keys(&mut BufReader::new(File::open(path)?))
+    {
+        if key.len() != 0 {
+            return Ok(key);
+        }
     }
     Err(new_io_err("invalid key"))
 }
 
+/*
+// whoops! rustls does not support such format
+// users can use openssl to convert it to pkcs8:
+//
+// openssl pkcs8 -topk8 -nocrypt -in x.key -out xx.pem
+//
+// but I have no idea how to write code to achieve this
+// maybe use openssl's rust binding..?
+//
+// deprecated below
 // legacy format
 fn ec_private_keys(rd: &mut dyn io::BufRead) -> Result<Vec<PrivateKey>, ()> {
     extract(
@@ -89,3 +103,4 @@ fn extract<A>(
         }
     }
 }
+*/
