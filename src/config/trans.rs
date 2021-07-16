@@ -4,6 +4,7 @@ use super::WithTransport;
 use crate::transport::ws;
 use crate::transport::{AsyncConnect, AsyncAccept};
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "proto", rename_all = "lowercase")]
 pub enum TransportConfig {

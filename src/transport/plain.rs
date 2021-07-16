@@ -17,6 +17,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(unix)]
 use tokio::net::{UnixStream, UnixListener};
 
+#[allow(clippy::upper_case_acronyms)]
 pub enum PlainStream {
     TCP(TcpStream),
     #[cfg(unix)]
@@ -176,7 +177,7 @@ impl AsyncConnect for Connector {
     async fn connect(&self) -> io::Result<Self::IO> {
         let stream = match &self.addr {
             CommonAddr::DomainName(addr, port) => {
-                let ip = dns::resolve_async(&addr).await?;
+                let ip = dns::resolve_async(addr).await?;
                 let sockaddr = SocketAddr::new(ip, *port);
                 PlainStream::TCP(TcpStream::connect(sockaddr).await?)
             }
@@ -194,6 +195,7 @@ impl AsyncConnect for Connector {
 }
 
 // Plain Acceptor
+#[allow(clippy::upper_case_acronyms)]
 pub enum PlainListener {
     TCP(TcpListener),
     #[cfg(unix)]

@@ -1,5 +1,4 @@
 use lazy_static::lazy_static;
-use rustls_native_certs;
 use rustls::RootCertStore;
 
 pub const BUF_SIZE: usize = 0x4000;

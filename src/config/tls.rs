@@ -101,7 +101,6 @@ fn make_client_config(config: &TLSClientConfig) -> ClientConfig {
                     fs::File::open(file_path).expect("invalid cert file"),
                 ))
                 .unwrap();
-            ()
         }
     };
     tlsc

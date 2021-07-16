@@ -92,8 +92,7 @@ fn spawn_conn_half_with_trans<L, C>(
     conn_trans: &TransportConfig,
     lis: L,
     conn: C,
-) -> ()
-where
+) where
     L: AsyncAccept + 'static,
     C: AsyncConnect + 'static,
 {
@@ -116,8 +115,7 @@ fn spawn_lis_half_with_trans<L, C>(
     conn_trans: &TransportConfig,
     lis: L,
     conn: C,
-) -> ()
-where
+) where
     L: AsyncAccept + 'static,
     C: AsyncConnect + 'static,
 {
@@ -139,7 +137,7 @@ fn spawn_with_tls(
     ep: &EndpointConfig,
     lis: plain::Acceptor,
     conn: plain::Connector,
-) -> () {
+) {
     match &ep.listen.tls {
         TLSConfig::Server(lisc) => match &ep.remote.tls {
             TLSConfig::Client(connc) => spawn_lis_half_with_trans(

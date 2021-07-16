@@ -29,14 +29,14 @@ pub fn load_keys(path: &str) -> io::Result<Vec<PrivateKey>> {
     if let Ok(key) =
         pemfile::pkcs8_private_keys(&mut BufReader::new(File::open(path)?))
     {
-        if key.len() != 0 {
+        if !key.is_empty() {
             return Ok(key);
         }
     }
     if let Ok(key) =
         pemfile::rsa_private_keys(&mut BufReader::new(File::open(path)?))
     {
-        if key.len() != 0 {
+        if !key.is_empty() {
             return Ok(key);
         }
     }
