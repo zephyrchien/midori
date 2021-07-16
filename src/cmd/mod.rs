@@ -1,4 +1,5 @@
 use clap::{Arg, App, SubCommand};
+use crate::utils::VERSION;
 
 mod nav;
 pub use nav::run_navigator;
@@ -11,7 +12,7 @@ pub enum CmdInput {
 
 pub fn scan() -> CmdInput {
     let matches = App::new("Midori")
-        .version("0.1.1")
+        .version(VERSION)
         .about("A multi-protocol network relay")
         .author("zephyr <i@zephyr.moe>")
         .arg(

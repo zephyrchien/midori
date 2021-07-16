@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use rustls::RootCertStore;
 
+pub const VERSION: &str = "0.2.0";
 pub const BUF_SIZE: usize = 0x4000;
 pub const PIPE_BUF_SIZE: usize = 0x10000;
 pub const OCSP_BUF_SIZE: usize = 0x400;
