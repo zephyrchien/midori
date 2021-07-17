@@ -71,6 +71,7 @@ where
     'LOOP: loop {
         // read until the socket buffer is empty
         // or the pipe is filled
+        // clear readiness (EPOLLIN)
         r.read(&mut [0u8; 0]).await?;
         while n < PIPE_BUF_SIZE {
             match splice_n(rfd, wpipe, PIPE_BUF_SIZE - n) {
@@ -85,13 +86,11 @@ where
         }
         // write until the pipe is empty
         while n > 0 {
+            // clear readiness (EPOLLOUT)
             w.write(&[0u8; 0]).await?;
             match splice_n(rpipe, wfd, n) {
                 x if x > 0 => n -= x as usize,
-                x if x < 0 && is_wouldblock() => {
-                    // clear readiness (EPOLLOUT)
-                    w.write(&[0u8; 0]).await?;
-                }
+                x if x < 0 && is_wouldblock() => {}
                 _ => break 'LOOP,
             }
         }
@@ -99,8 +98,6 @@ where
         if done {
             break;
         }
-        // clear readiness (EPOLLIN)
-        r.read(&mut [0u8; 0]).await?;
     }
 
     w.shutdown().await?;
