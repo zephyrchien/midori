@@ -17,6 +17,13 @@ jobs:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
           - x86_64-pc-windows-gnu
+        include:
+          - target: x86_64-unknown-linux-gnu
+            output: midori
+          - target: x86_64-unknown-linux-musl
+            output: midori
+          - target: x86_64-pc-windows-gnu
+            output: midori.exe
     steps:
       - uses: actions/checkout@v2
       - name: install toolchain
@@ -35,7 +42,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: midori-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/midori*
+          path: target/${{ matrix.target }}/release/${{ matrix.output }}
   build-apple:
     runs-on: macos-latest
     strategy:

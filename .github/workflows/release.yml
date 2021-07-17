@@ -13,6 +13,13 @@ jobs:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
           - x86_64-pc-windows-gnu
+        include:
+          - target: x86_64-unknown-linux-gnu
+            output: midori
+          - target: x86_64-unknown-linux-musl
+            output: midori
+          - target: x86_64-pc-windows-gnu
+            output: midori.exe
     steps:
       - uses: actions/checkout@v2
       - name: install toolchain
@@ -31,7 +38,7 @@ jobs:
         run: |
           mkdir -p release-${{ matrix.target }}
           cd release-${{ matrix.target }}
-          tar -zcf midori-${{ matrix.target }}.tar.gz ../target/${{ matrix.target }}/release/midori*
+          tar -C ../target/${{ matrix.target }}/release -zcf midori-${{ matrix.target }}.tar.gz ${{ matrix.output }}
           sha256sum midori-${{ matrix.target }}.tar.gz > midori-${{ matrix.target }}.sha256
       - name: release
         uses: softprops/action-gh-release@v1
@@ -63,7 +70,7 @@ jobs:
         run: |
           mkdir -p release-${{ matrix.target }}
           cd release-${{ matrix.target }}
-          tar -zcf midori-${{ matrix.target }}.tar.gz ../target/${{ matrix.target }}/release/midori
+          tar -C ../target/${{ matrix.target }}/release/ -zcf midori-${{ matrix.target }}.tar.gz midori
           shasum -a 256 midori-${{ matrix.target }}.tar.gz > midori-${{ matrix.target }}.sha256
       - name: release
         uses: softprops/action-gh-release@v1
