@@ -1,5 +1,5 @@
 use clap::{Arg, App, SubCommand};
-use crate::utils::VERSION;
+use crate::utils::{VERSION, NAV_VERSION};
 
 mod nav;
 pub use nav::run_navigator;
@@ -26,7 +26,7 @@ pub fn scan() -> CmdInput {
         .subcommand(
             SubCommand::with_name("nav")
                 .about("An Interactive config editor")
-                .version("0.1.0")
+                .version(NAV_VERSION)
                 .author("zephyr <i@zephyr.moe>"),
         )
         .get_matches();
