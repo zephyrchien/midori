@@ -1,7 +1,7 @@
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::net::{SocketAddr, IpAddr, Ipv4Addr};
+use std::net::SocketAddr;
 use futures::executor::block_on;
 
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -57,7 +57,7 @@ impl PlainStream {
             _ => Ok(()),
         }
     }
-
+    #[cfg(target_os = "linux")] // unused unless meet zero-copy
     pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
         (ReadHalf(&*self), WriteHalf(&*self))
     }
@@ -216,6 +216,8 @@ impl PlainListener {
         })
     }
     pub async fn accept_plain(&self) -> io::Result<(PlainStream, SocketAddr)> {
+        #[cfg(unix)]
+        use std::net::{IpAddr, Ipv4Addr};
         Ok(match self {
             PlainListener::TCP(x) => {
                 let (stream, sockaddr) = x.accept().await?;

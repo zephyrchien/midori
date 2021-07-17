@@ -1,6 +1,8 @@
 use std::fmt::{self, Display, Formatter};
-use std::path::PathBuf;
 use std::net::SocketAddr;
+
+#[cfg(unix)]
+use std::path::PathBuf;
 
 #[derive(Clone)]
 pub enum CommonAddr {

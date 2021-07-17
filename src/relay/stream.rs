@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use futures::try_join;
 
 use super::copy;
-use crate::transport::plain::{self, PlainStream, PlainListener};
+use crate::transport::plain::{PlainStream, PlainListener};
 use crate::transport::{AsyncConnect, AsyncAccept};
 
 async fn bidi_copy<S, C>(
@@ -38,13 +38,14 @@ where
 
 // zero copy
 #[cfg(target_os = "linux")]
-use super::zero_copy;
+use crate::transport::plain;
 
 #[cfg(target_os = "linux")]
 async fn bidi_zero_copy(
     mut sin: PlainStream,
     conn: plain::Connector,
 ) -> io::Result<()> {
+    use super::zero_copy;
     let mut sout = conn.connect().await?;
     let (mut ri, mut wi) = sin.split();
     let (mut ro, mut wo) = sout.split();

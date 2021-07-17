@@ -1,5 +1,4 @@
 use std::io;
-use std::path::PathBuf;
 use std::net::SocketAddr;
 use futures::future::join_all;
 
@@ -48,6 +47,8 @@ fn parse_socket_addr(
 }
 
 fn new_plain_conn(addr: &str, net: &NetConfig) -> plain::Connector {
+    #[cfg(unix)]
+    use std::path::PathBuf;
     match net {
         NetConfig::TCP => {
             let sockaddr = parse_socket_addr(addr, true).unwrap();
@@ -63,6 +64,8 @@ fn new_plain_conn(addr: &str, net: &NetConfig) -> plain::Connector {
 }
 
 fn new_plain_lis(addr: &str, net: &NetConfig) -> plain::Acceptor {
+    #[cfg(unix)]
+    use std::path::PathBuf;
     match net {
         NetConfig::TCP => {
             let sockaddr = parse_socket_addr(addr, false).unwrap();
@@ -77,6 +80,7 @@ fn new_plain_lis(addr: &str, net: &NetConfig) -> plain::Acceptor {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn meet_zero_copy(
     lis_trans: &TransportConfig,
     conn_trans: &TransportConfig,
