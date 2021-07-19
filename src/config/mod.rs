@@ -12,7 +12,7 @@ mod trans;
 pub use dns::DnsMode;
 pub use net::NetConfig;
 pub use tls::{TLSConfig, TLSClientConfig, TLSServerConfig};
-pub use trans::{TransportConfig, WebSocketConfig};
+pub use trans::{TransportConfig, WebSocketConfig, HTTP2Config};
 pub use ep::EndpointConfig;
 
 #[derive(Debug, Serialize, Deserialize)]

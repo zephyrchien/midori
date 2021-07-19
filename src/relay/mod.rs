@@ -8,7 +8,7 @@ use crate::dns;
 use crate::utils::{self, CommonAddr};
 use crate::config::{
     EndpointConfig, NetConfig, WithTransport, TransportConfig, WebSocketConfig,
-    TLSConfig,
+    HTTP2Config, TLSConfig,
 };
 use crate::transport::plain;
 use crate::transport::{AsyncConnect, AsyncAccept};
@@ -110,6 +110,12 @@ fn spawn_conn_half_with_trans<L, C>(
             );
             workers.push(tokio::spawn(stream::proxy(lis, conn)));
         }
+        TransportConfig::H2(connc) => {
+            let conn = <HTTP2Config as WithTransport<L, C>>::apply_to_conn(
+                connc, conn,
+            );
+            workers.push(tokio::spawn(stream::proxy(lis, conn)));
+        }
     }
 }
 
@@ -131,6 +137,11 @@ fn spawn_lis_half_with_trans<L, C>(
             let lis = <WebSocketConfig as WithTransport<L, C>>::apply_to_lis(
                 lisc, lis,
             );
+            spawn_conn_half_with_trans(workers, conn_trans, lis, conn);
+        }
+        TransportConfig::H2(lisc) => {
+            let lis =
+                <HTTP2Config as WithTransport<L, C>>::apply_to_lis(lisc, lis);
             spawn_conn_half_with_trans(workers, conn_trans, lis, conn);
         }
     }

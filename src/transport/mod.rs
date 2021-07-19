@@ -6,6 +6,7 @@ use crate::utils::CommonAddr;
 
 pub mod plain;
 pub mod ws;
+pub mod h2;
 pub mod tls;
 use plain::PlainStream;
 

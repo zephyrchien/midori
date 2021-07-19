@@ -29,5 +29,6 @@ rustls-native-certs = { version = "0.5", features = ["rustls"] }
 
 tokio = { version = "1", features = ["full"] }
 trust-dns-resolver = "0.20"
-tokio-tungstenite = "0.15"
 tokio-rustls = "0.22"
+tokio-tungstenite = "0.15"
+h2 = "0.3"
