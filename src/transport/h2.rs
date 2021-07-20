@@ -238,6 +238,17 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
             conn.accept().await;
         });
 
+        // check request path
+        if request.uri().path() != self.path {
+            let _ = response.send_response(
+                Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(())
+                    .unwrap(),
+                true,
+            );
+            return Err(utils::new_io_err("invalid path"));
+        }
         // get recv stream from request body
         let recv = request.into_body();
 
