@@ -8,7 +8,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpStream, TcpListener};
 use async_trait::async_trait;
 
-use super::{AsyncConnect, AsyncAccept, IOStream};
+use super::{AsyncConnect, AsyncAccept, IOStream, Transport};
 use crate::dns;
 use crate::utils::{self, CommonAddr};
 
@@ -170,6 +170,10 @@ impl Connector {
 
 #[async_trait]
 impl AsyncConnect for Connector {
+    const TRANS: Transport = Transport::TCP;
+
+    const SCHEME: &'static str = "tcp";
+
     type IO = PlainStream;
 
     fn addr(&self) -> &CommonAddr { &self.addr }
@@ -246,6 +250,10 @@ impl Acceptor {
 
 #[async_trait]
 impl AsyncAccept for Acceptor {
+    const TRANS: Transport = Transport::TCP;
+
+    const SCHEME: &'static str = "tcp";
+
     type IO = PlainStream;
 
     fn addr(&self) -> &CommonAddr { &self.addr }

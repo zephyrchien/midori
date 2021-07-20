@@ -12,8 +12,18 @@ use plain::PlainStream;
 
 trait IOStream: AsyncRead + AsyncWrite + Send + Sync + Unpin {}
 
+#[allow(clippy::upper_case_acronyms)]
+pub enum Transport {
+    TCP,
+    TLS,
+    WS,
+    H2,
+}
+
 #[async_trait]
 pub trait AsyncConnect: Send + Sync + Unpin + Clone {
+    const TRANS: Transport;
+    const SCHEME: &'static str;
     type IO: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static;
     fn addr(&self) -> &CommonAddr;
     async fn connect(&self) -> io::Result<Self::IO>;
@@ -21,6 +31,8 @@ pub trait AsyncConnect: Send + Sync + Unpin + Clone {
 
 #[async_trait]
 pub trait AsyncAccept: Send + Sync + Unpin + Clone {
+    const TRANS: Transport;
+    const SCHEME: &'static str;
     type IO: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static;
     fn addr(&self) -> &CommonAddr;
     async fn accept(

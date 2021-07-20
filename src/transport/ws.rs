@@ -8,7 +8,7 @@ use futures::sink::Sink;
 use futures::stream::Stream;
 
 use bytes::BytesMut;
-use http::StatusCode;
+use http::{Uri, StatusCode};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite;
@@ -17,7 +17,7 @@ use tungstenite::protocol::WebSocketConfig;
 use tungstenite::handshake::server::{Callback, Request, Response, ErrorResponse};
 use async_trait::async_trait;
 
-use super::{AsyncConnect, AsyncAccept, IOStream};
+use super::{AsyncConnect, AsyncAccept, IOStream, Transport};
 use super::plain::PlainStream;
 use crate::utils::{self, CommonAddr};
 
@@ -131,15 +131,21 @@ where
 #[derive(Clone)]
 pub struct Connector<T: AsyncConnect> {
     cc: T,
-    req: String,
+    uri: Uri,
     config: Option<WebSocketConfig>,
 }
 
 impl<T: AsyncConnect> Connector<T> {
-    pub fn new(cc: T, req: String) -> Self {
+    pub fn new(cc: T, path: String) -> Self {
+        let authority = cc.addr().to_string();
         Connector {
             cc,
-            req,
+            uri: Uri::builder()
+                .scheme(Self::SCHEME)
+                .authority(authority.as_str())
+                .path_and_query(path)
+                .build()
+                .unwrap(),
             config: None,
         }
     }
@@ -147,6 +153,13 @@ impl<T: AsyncConnect> Connector<T> {
 
 #[async_trait]
 impl<T: AsyncConnect> AsyncConnect for Connector<T> {
+    const TRANS: Transport = Transport::WS;
+
+    const SCHEME: &'static str = match T::TRANS {
+        Transport::TLS => "wss",
+        _ => "ws",
+    };
+
     type IO = WSStream<T::IO>;
 
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
@@ -154,7 +167,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     async fn connect(&self) -> io::Result<Self::IO> {
         let stream = self.cc.connect().await?;
         tokio_tungstenite::client_async_with_config(
-            &self.req,
+            &self.uri,
             stream,
             self.config,
         )
@@ -210,6 +223,13 @@ impl Callback for RequestHook {
 
 #[async_trait]
 impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
+    const TRANS: Transport = Transport::WS;
+
+    const SCHEME: &'static str = match T::TRANS {
+        Transport::TLS => "wss",
+        _ => "ws",
+    };
+
     type IO = WSStream<T::IO>;
 
     fn addr(&self) -> &CommonAddr { self.lis.addr() }

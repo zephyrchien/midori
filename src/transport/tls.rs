@@ -10,7 +10,7 @@ use tokio_rustls::{TlsAcceptor, TlsConnector};
 pub use tokio_rustls::client::TlsStream as ClientTLSStream;
 pub use tokio_rustls::server::TlsStream as ServerTLSStream;
 
-use super::{AsyncConnect, AsyncAccept};
+use super::{AsyncConnect, AsyncAccept, Transport};
 use super::plain::PlainStream;
 use crate::utils::{self, CommonAddr};
 
@@ -34,6 +34,10 @@ impl<T: AsyncConnect> Connector<T> {
 
 #[async_trait]
 impl<T: AsyncConnect> AsyncConnect for Connector<T> {
+    const TRANS: Transport = Transport::TLS;
+
+    const SCHEME: &'static str = "tls";
+
     type IO = ClientTLSStream<T::IO>;
 
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
@@ -62,6 +66,10 @@ impl<T: AsyncAccept> Acceptor<T> {
 
 #[async_trait]
 impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
+    const TRANS: Transport = Transport::TLS;
+
+    const SCHEME: &'static str = "tls";
+
     type IO = ServerTLSStream<T::IO>;
 
     fn addr(&self) -> &utils::CommonAddr { self.lis.addr() }

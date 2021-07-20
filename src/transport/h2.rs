@@ -6,14 +6,14 @@ use std::net::SocketAddr;
 use futures::ready;
 
 use bytes::{Bytes, BytesMut};
-use http::{Version, StatusCode, Request, Response};
+use http::{Uri, Version, StatusCode, Request, Response};
 use tokio::io::{AsyncRead, AsyncWrite};
 use h2::{client, server};
 use h2::{SendStream, RecvStream};
 
 use async_trait::async_trait;
 
-use super::{AsyncConnect, AsyncAccept, IOStream};
+use super::{AsyncConnect, AsyncAccept, IOStream, Transport};
 use super::plain::PlainStream;
 use crate::utils::{self, CommonAddr};
 
@@ -125,15 +125,33 @@ impl AsyncWrite for H2Stream {
 #[derive(Clone)]
 pub struct Connector<T: AsyncConnect> {
     cc: T,
-    path: String,
+    uri: Uri,
 }
 
 impl<T: AsyncConnect> Connector<T> {
-    pub fn new(cc: T, path: String) -> Self { Connector { cc, path } }
+    pub fn new(cc: T, path: String) -> Self {
+        let authority = cc.addr().to_string();
+        Connector {
+            cc,
+            uri: Uri::builder()
+                .scheme(Self::SCHEME)
+                .authority(authority.as_str())
+                .path_and_query(path)
+                .build()
+                .unwrap(),
+        }
+    }
 }
 
 #[async_trait]
 impl<T: AsyncConnect> AsyncConnect for Connector<T> {
+    const TRANS: Transport = Transport::H2;
+
+    const SCHEME: &'static str = match T::TRANS {
+        Transport::TLS => "https",
+        _ => "http",
+    };
+
     type IO = H2Stream;
 
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
@@ -157,7 +175,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
         let (response, send) = client
             .send_request(
                 Request::builder()
-                    .uri(&self.path)
+                    .uri(&self.uri)
                     .version(Version::HTTP_2)
                     .body(())
                     .unwrap(),
@@ -188,6 +206,13 @@ impl<T: AsyncAccept> Acceptor<T> {
 
 #[async_trait]
 impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
+    const TRANS: Transport = Transport::H2;
+
+    const SCHEME: &'static str = match T::TRANS {
+        Transport::TLS => "https",
+        _ => "http",
+    };
+
     type IO = H2Stream;
 
     fn addr(&self) -> &CommonAddr { self.lis.addr() }
