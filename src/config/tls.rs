@@ -18,12 +18,12 @@ pub enum TLSConfig {
     Server(TLSServerConfig),
 }
 
+impl Default for TLSConfig {
+    fn default() -> Self { Self::None }
+}
+
 // create default values
 fn def_true() -> bool { true }
-
-fn def_empty_str() -> String { String::new() }
-
-fn def_empty_vec() -> Vec<String> { Vec::new() }
 
 fn def_roots_str() -> String { "firefox".to_string() }
 
@@ -31,17 +31,23 @@ fn def_roots_str() -> String { "firefox".to_string() }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TLSClientConfig {
     pub skip_verify: bool,
+
     #[serde(default = "def_true")]
     pub enable_sni: bool,
+
     #[serde(default)]
     pub enable_early_data: bool,
-    #[serde(default = "def_empty_str")]
+
+    #[serde(default)]
     pub sni: String,
-    #[serde(default = "def_empty_vec")]
+
+    #[serde(default)]
     pub alpns: Vec<String>,
+
     // tlsv1.2, tlsv1.3
-    #[serde(default = "def_empty_vec")]
+    #[serde(default)]
     pub versions: Vec<String>,
+
     // native, firefox, or provide a file
     #[serde(default = "def_roots_str")]
     pub roots: String,
@@ -131,12 +137,16 @@ impl TLSClientConfig {
 // TLS Server
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TLSServerConfig {
-    #[serde(default = "def_empty_vec")]
-    pub alpns: Vec<String>,
-    #[serde(default = "def_empty_vec")]
-    pub versions: Vec<String>,
     pub cert: String,
+
     pub key: String,
+
+    #[serde(default)]
+    pub alpns: Vec<String>,
+
+    #[serde(default)]
+    pub versions: Vec<String>,
+
     #[serde(default)]
     pub ocsp: String,
 }

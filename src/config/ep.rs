@@ -4,26 +4,41 @@ use super::net::NetConfig;
 use super::tls::TLSConfig;
 use super::trans::TransportConfig;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct EpHalfConfig {
     pub addr: String,
-    #[serde(default = "def_net")]
+
+    #[serde(default)]
     pub net: NetConfig,
-    #[serde(default = "def_trans")]
+
+    #[serde(default)]
     pub trans: TransportConfig,
-    #[serde(default = "def_tls")]
+
+    #[serde(default)]
     pub tls: TLSConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct EndpointConfig {
-    pub listen: EpHalfConfig,
-    pub remote: EpHalfConfig,
+#[serde(untagged)]
+pub enum MaybeHalfConfig {
+    Addr(String),
+    Config(EpHalfConfig),
 }
 
-// create default values
-fn def_net() -> NetConfig { NetConfig::TCP }
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EndpointConfig {
+    pub listen: MaybeHalfConfig,
+    pub remote: MaybeHalfConfig,
+}
 
-fn def_trans() -> TransportConfig { TransportConfig::Plain }
-
-fn def_tls() -> TLSConfig { TLSConfig::None }
+impl From<MaybeHalfConfig> for EpHalfConfig {
+    fn from(x: MaybeHalfConfig) -> Self {
+        match x {
+            MaybeHalfConfig::Addr(s) => EpHalfConfig {
+                addr: s,
+                ..Default::default()
+            },
+            MaybeHalfConfig::Config(c) => c,
+        }
+    }
+}

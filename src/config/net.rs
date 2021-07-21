@@ -9,3 +9,7 @@ pub enum NetConfig {
     #[cfg(unix)]
     UDS,
 }
+
+impl Default for NetConfig {
+    fn default() -> Self { Self::TCP }
+}

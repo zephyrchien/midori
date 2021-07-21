@@ -7,8 +7,8 @@ use tokio::task::JoinHandle;
 use crate::dns;
 use crate::utils::{self, CommonAddr};
 use crate::config::{
-    EndpointConfig, NetConfig, WithTransport, TransportConfig, WebSocketConfig,
-    HTTP2Config, TLSConfig,
+    EndpointConfig, EpHalfConfig, HTTP2Config, NetConfig, TLSConfig,
+    TransportConfig, WebSocketConfig, WithTransport,
 };
 use crate::transport::plain;
 use crate::transport::{AsyncConnect, AsyncAccept};
@@ -149,40 +149,41 @@ fn spawn_lis_half_with_trans<L, C>(
 
 fn spawn_with_tls(
     workers: &mut Vec<JoinHandle<io::Result<()>>>,
-    ep: &EndpointConfig,
+    listen: &EpHalfConfig,
+    remote: &EpHalfConfig,
     lis: plain::Acceptor,
     conn: plain::Connector,
 ) {
-    match &ep.listen.tls {
-        TLSConfig::Server(lisc) => match &ep.remote.tls {
+    match &listen.tls {
+        TLSConfig::Server(lisc) => match &remote.tls {
             TLSConfig::Client(connc) => spawn_lis_half_with_trans(
                 workers,
-                &ep.listen.trans,
-                &ep.remote.trans,
+                &listen.trans,
+                &remote.trans,
                 lisc.apply_to_lis(lis),
                 connc.apply_to_conn(conn),
             ),
             _ => spawn_lis_half_with_trans(
                 workers,
-                &ep.listen.trans,
-                &ep.remote.trans,
+                &listen.trans,
+                &remote.trans,
                 lisc.apply_to_lis(lis),
                 conn,
             ),
         },
-        _ => match &ep.remote.tls {
+        _ => match &remote.tls {
             TLSConfig::Client(connc) => spawn_lis_half_with_trans(
                 workers,
-                &ep.listen.trans,
-                &ep.remote.trans,
+                &listen.trans,
+                &remote.trans,
                 lis,
                 connc.apply_to_conn(conn),
             ),
 
             _ => spawn_lis_half_with_trans(
                 workers,
-                &ep.listen.trans,
-                &ep.remote.trans,
+                &listen.trans,
+                &remote.trans,
                 lis,
                 conn,
             ),
@@ -194,14 +195,21 @@ pub async fn run(eps: Vec<EndpointConfig>) {
     let mut workers: Vec<JoinHandle<io::Result<()>>> =
         Vec::with_capacity(eps.len());
     for ep in eps.into_iter() {
-        let plain_lis = new_plain_lis(&ep.listen.addr, &ep.listen.net);
-        let plain_conn = new_plain_conn(&ep.remote.addr, &ep.remote.net);
+        // convert to full config
+        let EndpointConfig { listen, remote } = ep;
+        let listen: EpHalfConfig = listen.into();
+        let remote: EpHalfConfig = remote.into();
+        // init listener and connector
+        let plain_lis = new_plain_lis(&listen.addr, &listen.net);
+        let plain_conn = new_plain_conn(&remote.addr, &remote.net);
+        // create zero-copy task
         #[cfg(target_os = "linux")]
-        if meet_zero_copy(&ep.listen.trans, &ep.remote.trans) {
+        if meet_zero_copy(&listen.trans, &remote.trans) {
             workers.push(tokio::spawn(stream::splice(plain_lis, plain_conn)));
             continue;
         }
-        spawn_with_tls(&mut workers, &ep, plain_lis, plain_conn);
+        // load transport config and create task
+        spawn_with_tls(&mut workers, &listen, &remote, plain_lis, plain_conn);
     }
     join_all(workers).await;
 }

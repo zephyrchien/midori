@@ -13,6 +13,10 @@ pub enum TransportConfig {
     H2(HTTP2Config),
 }
 
+impl Default for TransportConfig {
+    fn default() -> Self { Self::Plain }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WebSocketConfig {
     pub path: String,
