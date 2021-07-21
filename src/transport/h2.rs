@@ -7,6 +7,7 @@ use futures::ready;
 
 use bytes::{Bytes, BytesMut};
 use http::{Uri, Version, StatusCode, Request, Response};
+use http::uri::{Parts, PathAndQuery};
 use tokio::io::{AsyncRead, AsyncWrite};
 use h2::{client, server};
 use h2::{SendStream, RecvStream};
@@ -126,10 +127,11 @@ impl AsyncWrite for H2Stream {
 pub struct Connector<T: AsyncConnect> {
     cc: T,
     uri: Uri,
+    allow_push: bool,
 }
 
 impl<T: AsyncConnect> Connector<T> {
-    pub fn new(cc: T, path: String) -> Self {
+    pub fn new(cc: T, path: String, allow_push: bool) -> Self {
         let authority = cc.addr().to_string();
         Connector {
             cc,
@@ -139,6 +141,7 @@ impl<T: AsyncConnect> Connector<T> {
                 .path_and_query(path)
                 .build()
                 .unwrap(),
+            allow_push,
         }
     }
 }
@@ -159,7 +162,9 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     async fn connect(&self) -> io::Result<Self::IO> {
         let stream = self.cc.connect().await?;
         // establish a new connection
-        let (h2, conn) = client::handshake(stream)
+        let (h2, conn) = client::Builder::new()
+            .enable_push(self.allow_push)
+            .handshake(stream)
             .await
             .map_err(|e| utils::new_io_err(&e.to_string()))?;
 
@@ -172,7 +177,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
             .map_err(|e| utils::new_io_err(&e.to_string()))?;
 
         // request with a send stream
-        let (response, send) = client
+        let (mut response, send) = client
             .send_request(
                 Request::builder()
                     .uri(&self.uri)
@@ -183,12 +188,37 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
             )
             .map_err(|e| utils::new_io_err(&e.to_string()))?;
 
+        // prepare to recv server push
+        let mut pushes = response.push_promises();
+        let push = pushes.push_promise();
+
         // get recv stream from response body
         let recv = response
             .await
             .map_err(|e| utils::new_io_err(&e.to_string()))?
             .into_body();
 
+        // try recv stream from push body
+        // NOT SOLVED:
+        // ALWAYS HANG when try to 
+        // resolve the recv stream
+        // from the pushed response
+        if self.allow_push {
+            if let Some(Ok(push)) = push.await {
+                let (_, push) = push.into_parts();
+                // HANG
+                if let Ok(response) = push.await {
+                    let recv = response.into_body();
+                    return Ok(H2Stream::new(
+                        recv,
+                        send,
+                        BytesMut::with_capacity(4096),
+                    ));
+                }
+            }
+        }
+
+        // fallback
         Ok(H2Stream::new(recv, send, BytesMut::with_capacity(4096)))
     }
 }
@@ -198,10 +228,17 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
 pub struct Acceptor<T: AsyncAccept> {
     lis: T,
     path: String,
+    server_push: bool,
 }
 
 impl<T: AsyncAccept> Acceptor<T> {
-    pub fn new(lis: T, path: String) -> Self { Acceptor { lis, path } }
+    pub fn new(lis: T, path: String, server_push: bool) -> Self {
+        Acceptor {
+            lis,
+            path,
+            server_push,
+        }
+    }
 }
 
 #[async_trait]
@@ -249,8 +286,20 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
             );
             return Err(utils::new_io_err("invalid path"));
         }
+
         // get recv stream from request body
-        let recv = request.into_body();
+        let (parts, recv) = request.into_parts();
+
+        // prepare server push
+        let mut pushed_uri_parts: Parts = parts.uri.into();
+        pushed_uri_parts.path_and_query =
+            PathAndQuery::from_static("/push").into();
+        let push = response.push_request(
+            Request::builder()
+                .uri(Uri::from_parts(pushed_uri_parts).unwrap())
+                .body(())
+                .unwrap(),
+        );
 
         // respond a send stream
         let send = response
@@ -260,6 +309,24 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
             )
             .map_err(|e| utils::new_io_err(&e.to_string()))?;
 
+        // try server push
+        if self.server_push {
+            if let Ok(mut push) = push {
+                let send = push.send_response(Response::new(()), false);
+                if let Ok(send) = send {
+                    return Ok((
+                        H2Stream::new(
+                            recv,
+                            send,
+                            BytesMut::with_capacity(4096),
+                        ),
+                        addr,
+                    ));
+                }
+            }
+        }
+
+        // fallback
         Ok((
             H2Stream::new(recv, send, BytesMut::with_capacity(4096)),
             addr,

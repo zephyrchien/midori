@@ -25,6 +25,9 @@ pub struct WebSocketConfig {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HTTP2Config {
     pub path: String,
+
+    #[serde(default)]
+    pub server_push: bool,
 }
 
 impl<L, C> WithTransport<L, C> for WebSocketConfig
@@ -52,9 +55,9 @@ where
     type Connector = h2::Connector<C>;
 
     fn apply_to_lis(&self, lis: L) -> Self::Acceptor {
-        h2::Acceptor::new(lis, self.path.clone())
+        h2::Acceptor::new(lis, self.path.clone(), self.server_push)
     }
     fn apply_to_conn(&self, conn: C) -> Self::Connector {
-        h2::Connector::new(conn, self.path.clone())
+        h2::Connector::new(conn, self.path.clone(), self.server_push)
     }
 }
