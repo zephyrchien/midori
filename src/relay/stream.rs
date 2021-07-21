@@ -15,8 +15,7 @@ where
     S: AsyncAccept,
     C: AsyncConnect,
 {
-    let (sin, _) = lis.accept(res).await?;
-    let sout = conn.connect().await?;
+    let ((sin, _), sout) = try_join!(lis.accept(res), conn.connect())?;
     let (ri, wi) = tokio::io::split(sin);
     let (ro, wo) = tokio::io::split(sout);
     let _ = try_join!(copy::copy(ri, wo), copy::copy(ro, wi));
