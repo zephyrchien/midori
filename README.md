@@ -50,7 +50,7 @@ Get started with a simple TCP relay(supports zero-copy on linux). First, write a
 ```json
 // config.json
 {
-    endpoints:[
+    "endpoints":[
         {
             "listen": "0.0.0.0:5000",
             "remote": "1.2.3.4:8080"
@@ -69,21 +69,21 @@ midori -c config.json
 ```
 
 #### Address Format
-Almost all kinds of format are supported, including `ipv4`, `ipv6`, `domain name`, `file path(recognized as uds)`
+Almost all kinds of formats are supported, including `ipv4`, `ipv6`, `domain name`, `file path(recognized as uds)`
 
-## Configure
+## Full Configure
 
 Currently, the config file consists of `gloal params` and `endpoints`
-```json
+```bash
 {
-    "dns_mode": "",  // and other global params
+    "dns_mode": "", // and other global params
     "endpoints": []
 }
 ```
 
 ---
 #### DNS Mode
-The `trust-dns` crate supports different strategies: `ipv4_only`, `ipv6_only`, **`ipv4_then_ipv6(default)`**, `ipv6_then_ipv4`, `ipv4_and_ipv6`.
+The `trust-dns` crate supports different resolve strategies: `ipv4_only`, `ipv6_only`, **`ipv4_then_ipv6(default)`**, `ipv6_then_ipv4`, `ipv4_and_ipv6`.
 
 ---
 #### Endpoint
@@ -100,8 +100,8 @@ In each endpoint, you need to specify the associated pair of `listen(server)` an
 #### Endpoint Half
 Below is the params of `listen` or `remote`. **Each field has a default value except for `addr`**. <br>
 Moreover, `trans` and `tls` also support more complicated configuration options(e.g. `path`, `sni`, `ocsp`..). [Please check docs of each protocol for more details][doc-url].
-```json
-// local or remote
+```bash
+// listen or remote
 {
     "addr": "",  // must
     "net": "",  // tcp(deafult), uds, udp
@@ -118,7 +118,7 @@ Finally, the config file *(json)* looks like:
     "dns_mode": "ipv4_then_ipv6",
     "endpoints": [
         {
-            listen: {
+            "listen": {
                 "addr": "0.0.0.0:5000",
                 "net": "tcp",
                 "trans": {
@@ -133,7 +133,7 @@ Finally, the config file *(json)* looks like:
                     "ocsp": "x.ocsp"
                 }
             },
-            remote: {
+            "remote": {
                 "addr": "www.example.com:443",
                 "net": "tcp",
                 "trans": {
