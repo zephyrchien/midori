@@ -26,7 +26,7 @@
 - [ ] gRPC
 - [ ] QUIC
 
-[doc-url]: https://github.com/zephyrchien/midori/tree/master/src
+[doc-url]: https://github.com/zephyrchien/midori/tree/master/docs
 
 [tcp-doc-url]: https://github.com/zephyrchien/midori/blob/master/docs/tcp.md
 
@@ -64,7 +64,7 @@ Get started with a simple TCP relay(supports zero-copy on linux). First, write a
 ```
 
 Then launch these 2 endpoints:
-```bash
+```shell
 midori -c config.json
 ```
 
@@ -74,7 +74,7 @@ Almost all kinds of formats are supported, including `ipv4`, `ipv6`, `domain nam
 ## Full Configure
 
 Currently, the config file consists of `gloal params` and `endpoints`
-```bash
+```shell
 {
     "dns_mode": "", // and other global params
     "endpoints": []
@@ -128,8 +128,8 @@ Finally, the config file *(json)* looks like:
                 "tls": {
                     "cert": "x.crt",
                     "key": "x.pem",
-                    "version": "tlsv1.3, tlsv1.2",
-                    "apln": "http/1.1",
+                    "versions": "tlsv1.3, tlsv1.2",
+                    "aplns": "http/1.1",
                     "ocsp": "x.ocsp"
                 }
             },
@@ -143,9 +143,9 @@ Finally, the config file *(json)* looks like:
                 },
                 "tls": {
                     "roots": "firefox",
-                    "version": "tlsv1.3, tlsv1.2",
+                    "versions": "tlsv1.3, tlsv1.2",
                     "sni": "www.example.com",
-                    "apln": "h2",
+                    "aplns": "h2",
                     "skip_verify": false,
                     "enable_sni": true,
                 }
