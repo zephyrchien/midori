@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+// this proto file is borrowed from v2fly/v2ray-core
+// package v2ray.core.transport.internet.grpc.encoding;
+// option go_package = "github.com/v2fly/v2ray-core/v4/transport/internet/grpc/encoding";
+package grpc_stream;
+
+message Hunk {
+  bytes data = 1;
+}
+
+service GunService {
+  rpc Tun (stream Hunk) returns (stream Hunk);
+}
