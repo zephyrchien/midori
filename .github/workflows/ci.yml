@@ -1,4 +1,4 @@
-name: clippy check
+name: ci
 on: push
 jobs:
   clippy_check:
