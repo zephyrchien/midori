@@ -12,28 +12,28 @@ global->endpoints->endpoint->listen|remote->net
 use default value: net = tcp, transport = plain, tls = none
 ```json
 {
-	"endpoints": [
-		{
-			"listen": "0.0.0.0:5000",
-			"remote": "example.com:443"
-		}
-	]
+  "endpoints": [
+    {
+      "listen": "0.0.0.0:5000",
+      "remote": "example.com:443"
+    }
+  ]
 }
 ```
 equals
 ```json
 {
-	"endpoints": [
-		{
-			"listen": {
-                "addr": "0.0.0.0:5000",
-                "net": "tcp"
-            },
-			"remote": {             
-                "addr": "0.0.0.0:5000",
-                "net": "tcp"
-		    }
-        }
-	]
+  "endpoints": [
+    {
+      "listen": {
+        "addr": "0.0.0.0:5000",
+        "net": "tcp"
+      },
+      "remote": {
+        "addr": "0.0.0.0:5000",
+        "net": "tcp"
+      }
+    }
+  ]
 }
 ```

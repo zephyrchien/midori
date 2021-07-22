@@ -11,17 +11,17 @@ global->endpoints->endpoint->listen|remote->net
 use default value: transport = plain, tls = none
 ```json
 {
-	"endpoints": [
-		{
-			"listen": {
-                "addr": "/home/midori/local.sock",
-                "net": "uds"
-            },
-			"remote": {             
-                "addr": "/home/midori/remote.sock",
-                "net": "uds"
-		    }
-        }
-	]
+  "endpoints": [
+    {
+      "listen": {
+        "addr": "/home/midori/local.sock",
+        "net": "uds"
+      },
+      "remote": {
+        "addr": "/home/midori/remote.sock",
+        "net": "uds"
+      }
+    }
+  ]
 }
 ```
