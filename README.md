@@ -40,13 +40,13 @@
 
 ## Usage
 ```bash
-# start from a config file
-# json (maybe toml will be supported in the future)
 midori -c config.json
 ```
 
 ## Quick Start
-Get started with a simple TCP relay(supports zero-copy on linux). First, write a config file:
+Get started with a simple TCP relay(supports zero-copy on linux).
+
+First, create a config file. Just specify the listen and remote address.
 ```json
 // config.json
 {
@@ -68,12 +68,58 @@ Then launch these 2 endpoints:
 midori -c config.json
 ```
 
-#### Address Format
-Almost all kinds of formats are supported, including `ipv4`, `ipv6`, `domain name`, `file path(recognized as uds)`
+Note: Almost all kinds of address are supported, including `ipv4`, `ipv6`, `domain name` and `unix socket path`.
 
-## Full Configure
+<br>
 
-Currently, the config file consists of `gloal params` and `endpoints`
+## Full Configuration
+<details>
+<summary>show example</summary>
+<pre><code>
+{
+  "dns_mode": "ipv4_then_ipv6",
+  "endpoints": [
+    {
+      "listen": {
+        "addr": "0.0.0.0:5000",
+        "net": "tcp",
+        "trans": {
+          "proto": "ws",
+          "path": "/"
+        },
+        "tls": {
+          "cert": "x.crt",
+          "key": "x.pem",
+          "versions": "tlsv1.3, tlsv1.2",
+          "aplns": "http/1.1",
+          "ocsp": "x.ocsp"
+        }
+      },
+      "remote": {
+        "addr": "www.example.com:443",
+        "net": "tcp",
+        "trans": {
+          "proto": "h2",
+          "path": "/",
+          "server_push": false
+        },
+        "tls": {
+          "roots": "firefox",
+          "versions": "tlsv1.3, tlsv1.2",
+          "sni": "www.example.com",
+          "aplns": "h2",
+          "skip_verify": false,
+          "enable_sni": true
+        }
+      }
+    }
+  ]
+}
+</code></pre>
+</details>
+
+### Global
+Currently, the configuration file only consists of 2 fields:
 ```shell
 {
     "dns_mode": "", // and other global params
@@ -81,14 +127,17 @@ Currently, the config file consists of `gloal params` and `endpoints`
 }
 ```
 
----
-#### DNS Mode
-The `trust-dns` crate supports different resolve strategies: `ipv4_only`, `ipv6_only`, **`ipv4_then_ipv6(default)`**, `ipv6_then_ipv4`, `ipv4_and_ipv6`.
+### DNS Mode
+The `trust-dns` crate supports these strategies:
+- ipv4_only
+- ipv6_only
+- ipv4_then_ipv6 (*default*)
+- ipv6_then_ipv4
+- ipv4_and_ipv6
 
----
-#### Endpoint
-In each endpoint, you need to specify the associated pair of `listen(server)` and `remote(client)`
-```json
+### Endpoint(s)
+Each endpoint contains an associated pair of `listen` and `remote`.
+```bash
 // endpoint
 {
     "listen": "",
@@ -96,10 +145,9 @@ In each endpoint, you need to specify the associated pair of `listen(server)` an
 }
 ```
 
----
-#### Endpoint Half
-Below is the params of `listen` or `remote`. **Each field has a default value except for `addr`**. <br>
-Moreover, `trans` and `tls` also support more complicated configuration options(e.g. `path`, `sni`, `ocsp`..). [Please check docs of each protocol for more details][doc-url].
+Below is the options of `listen` or `remote`. **Each field has a default value except for `addr`**. <br>
+
+Moreover, `trans` and `tls` also support more complicated params(e.g. `path`, `sni`, `ocsp`..). [See Protocol Docs for more details][doc-url].
 ```bash
 // listen or remote
 {
@@ -110,52 +158,7 @@ Moreover, `trans` and `tls` also support more complicated configuration options(
 }
 ```
 
----
-#### 
-Finally, the config file *(json)* looks like:
-```json
-{
-    "dns_mode": "ipv4_then_ipv6",
-    "endpoints": [
-        {
-            "listen": {
-                "addr": "0.0.0.0:5000",
-                "net": "tcp",
-                "trans": {
-                    "proto": "ws",
-                    "path": "/"
-                },
-                "tls": {
-                    "cert": "x.crt",
-                    "key": "x.pem",
-                    "versions": "tlsv1.3, tlsv1.2",
-                    "aplns": "http/1.1",
-                    "ocsp": "x.ocsp"
-                }
-            },
-            "remote": {
-                "addr": "www.example.com:443",
-                "net": "tcp",
-                "trans": {
-                    "proto": "h2",
-                    "path": "/",
-                    "server_push": false
-                },
-                "tls": {
-                    "roots": "firefox",
-                    "versions": "tlsv1.3, tlsv1.2",
-                    "sni": "www.example.com",
-                    "aplns": "h2",
-                    "skip_verify": false,
-                    "enable_sni": true,
-                }
-            }
-        },
-    ]
-}
-```
-
-All the protocols can be applied to both sides of `listen(server)` and `remote(client)`. You could either use `net(tcp, uds, udp)` directly or combine them with `transport(ws, h2..)`.
+Note that all the protocols can be applied to both sides of `listen` and `remote`. You could either use `net` directly or combine them with `transport`.
 | net | tcp | uds | udp |
 | :---: | :---: | :---: | :---: |
 | tls | O | O |
