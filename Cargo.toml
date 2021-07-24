@@ -27,7 +27,7 @@ webpki-roots = "0.21"
 rustls-native-certs = { version = "0.5", features = ["rustls"] }
 
 
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.9", features = ["full"] }
 trust-dns-resolver = "0.20"
 tokio-rustls = "0.22"
 tokio-tungstenite = "0.15"

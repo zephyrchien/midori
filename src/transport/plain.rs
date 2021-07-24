@@ -57,9 +57,53 @@ impl PlainStream {
             _ => Ok(()),
         }
     }
-    #[cfg(target_os = "linux")] // unused unless meet zero-copy
-    pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
-        (ReadHalf(&*self), WriteHalf(&*self))
+}
+
+#[cfg(target_os = "linux")]
+pub mod linux_ext {
+    use tokio::io::Interest;
+    use super::*;
+
+    #[inline]
+    pub fn split(x: &mut PlainStream) -> (ReadHalf, WriteHalf) {
+        (ReadHalf(&*x), WriteHalf(&*x))
+    }
+
+    // tokio >= 1.9.0
+    #[inline]
+    pub fn try_io<R>(
+        x: &PlainStream,
+        interest: Interest,
+        f: impl FnOnce() -> io::Result<R>,
+    ) -> io::Result<R> {
+        match x {
+            PlainStream::TCP(x) => x.try_io(interest, f),
+            PlainStream::UDS(x) => x.try_io(interest, f),
+        }
+    }
+
+    #[inline]
+    pub async fn readable(x: &PlainStream) -> io::Result<()> {
+        match x {
+            PlainStream::TCP(x) => x.readable().await,
+            PlainStream::UDS(x) => x.readable().await,
+        }
+    }
+
+    #[inline]
+    pub async fn writable(x: &PlainStream) -> io::Result<()> {
+        match x {
+            PlainStream::TCP(x) => x.writable().await,
+            PlainStream::UDS(x) => x.writable().await,
+        }
+    }
+
+    #[inline]
+    pub fn clear_readiness(x: &PlainStream, interest: Interest) {
+        use {io::Error, io::ErrorKind::WouldBlock};
+        let _ = try_io(x, interest, || {
+            Err(Error::new(WouldBlock, "")) as io::Result<()>
+        });
     }
 }
 

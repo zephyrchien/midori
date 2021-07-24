@@ -2,9 +2,10 @@ use std::io;
 use std::ops::Drop;
 use std::os::unix::io::AsRawFd;
 
-use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{Interest, AsyncWriteExt};
 
 use crate::utils::{self, PIPE_BUF_SIZE};
+use crate::transport::plain::{ReadHalf, WriteHalf, linux_ext};
 
 pub struct Pipe(i32, i32);
 
@@ -31,7 +32,7 @@ impl Pipe {
 }
 
 #[inline]
-pub fn splice_n(r: i32, w: i32, n: usize) -> isize {
+fn splice_n(r: i32, w: i32, n: usize) -> isize {
     use libc::{loff_t, SPLICE_F_MOVE, SPLICE_F_NONBLOCK};
     unsafe {
         libc::splice(
@@ -46,12 +47,68 @@ pub fn splice_n(r: i32, w: i32, n: usize) -> isize {
 }
 
 #[inline]
-pub fn is_wouldblock() -> bool {
+fn is_wouldblock() -> bool {
     use libc::{EAGAIN, EWOULDBLOCK};
     let errno = unsafe { *libc::__errno_location() };
     errno == EWOULDBLOCK || errno == EAGAIN
 }
 
+// tokio >= 1.9.0
+pub async fn copy(r: ReadHalf<'_>, mut w: WriteHalf<'_>) -> io::Result<()> {
+    // init pipe
+    let pipe = Pipe::create()?;
+    let (rpipe, wpipe) = (pipe.0, pipe.1);
+    // r/w ref
+    let rx = r.as_ref();
+    let wx = w.as_ref();
+    // r/w raw fd
+    let rfd = rx.as_raw_fd();
+    let wfd = wx.as_raw_fd();
+    // ctrl
+    let mut n: usize = 0;
+    let mut done = false;
+
+    'LOOP: loop {
+        // read until the socket buffer is empty
+        // or the pipe is filled
+        linux_ext::readable(rx).await?;
+        while n < PIPE_BUF_SIZE {
+            match splice_n(rfd, wpipe, PIPE_BUF_SIZE - n) {
+                x if x > 0 => n += x as usize,
+                x if x == 0 => {
+                    done = true;
+                    break;
+                }
+                x if x < 0 && is_wouldblock() => {
+                    linux_ext::clear_readiness(rx, Interest::READABLE);
+                    break;
+                }
+                _ => break 'LOOP,
+            }
+        }
+        // write until the pipe is empty
+        while n > 0 {
+            linux_ext::writable(wx).await?;
+            match splice_n(rpipe, wfd, n) {
+                x if x > 0 => n -= x as usize,
+                x if x < 0 && is_wouldblock() => {
+                    linux_ext::clear_readiness(wx, Interest::WRITABLE)
+                }
+                _ => break 'LOOP,
+            }
+        }
+        // complete
+        if done {
+            break;
+        }
+    }
+
+    w.shutdown().await?;
+    Ok(())
+}
+
+// before tokio 1.9.0
+/*
 pub async fn copy<X, Y, R, W>(mut r: R, mut w: W) -> io::Result<()>
 where
     X: AsRawFd,
@@ -103,3 +160,4 @@ where
     w.shutdown().await?;
     Ok(())
 }
+*/

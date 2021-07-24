@@ -46,13 +46,10 @@ async fn bidi_zero_copy(
 ) -> io::Result<()> {
     use super::zero_copy;
     let mut sout = conn.connect().await?;
-    let (mut ri, mut wi) = sin.split();
-    let (mut ro, mut wo) = sout.split();
+    let (ri, wi) = plain::linux_ext::split(&mut sin);
+    let (ro, wo) = plain::linux_ext::split(&mut sout);
 
-    let _ = try_join!(
-        zero_copy::copy(&mut ri, &mut wo),
-        zero_copy::copy(&mut ro, &mut wi)
-    );
+    let _ = try_join!(zero_copy::copy(ri, wo), zero_copy::copy(ro, wi));
 
     Ok(())
 }

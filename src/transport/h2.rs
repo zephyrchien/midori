@@ -200,7 +200,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
 
         // try recv stream from push body
         // NOT SOLVED:
-        // ALWAYS HANG when try to 
+        // ALWAYS HANG when try to
         // resolve the recv stream
         // from the pushed response
         if self.allow_push {
