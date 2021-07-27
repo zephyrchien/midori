@@ -91,35 +91,34 @@ fn meet_zero_copy(
     )
 }
 
-fn spawn_conn_half_with_trans<L, C>(
+fn spawn_lis_half_with_trans<L, C>(
     workers: &mut Vec<JoinHandle<io::Result<()>>>,
-    conn_trans: &TransportConfig,
+    lis_trans: &TransportConfig,
     lis: L,
     conn: C,
 ) where
     L: AsyncAccept + 'static,
     C: AsyncConnect + 'static,
 {
-    match conn_trans {
+    match lis_trans {
         TransportConfig::Plain => {
             workers.push(tokio::spawn(stream::proxy(lis, conn)));
         }
-        TransportConfig::WS(connc) => {
-            let conn = <WebSocketConfig as WithTransport<L, C>>::apply_to_conn(
-                connc, conn,
+        TransportConfig::WS(lisc) => {
+            let lis = <WebSocketConfig as WithTransport<L, C>>::apply_to_lis(
+                lisc, lis,
             );
             workers.push(tokio::spawn(stream::proxy(lis, conn)));
         }
-        TransportConfig::H2(connc) => {
-            let conn = <HTTP2Config as WithTransport<L, C>>::apply_to_conn(
-                connc, conn,
-            );
+        TransportConfig::H2(lisc) => {
+            let lis =
+                <HTTP2Config as WithTransport<L, C>>::apply_to_lis(lisc, lis);
             workers.push(tokio::spawn(stream::proxy(lis, conn)));
         }
     }
 }
 
-fn spawn_lis_half_with_trans<L, C>(
+fn spawn_conn_half_with_trans<L, C>(
     workers: &mut Vec<JoinHandle<io::Result<()>>>,
     lis_trans: &TransportConfig,
     conn_trans: &TransportConfig,
@@ -129,20 +128,21 @@ fn spawn_lis_half_with_trans<L, C>(
     L: AsyncAccept + 'static,
     C: AsyncConnect + 'static,
 {
-    match lis_trans {
+    match conn_trans {
         TransportConfig::Plain => {
-            spawn_conn_half_with_trans(workers, conn_trans, lis, conn);
+            spawn_lis_half_with_trans(workers, lis_trans, lis, conn);
         }
-        TransportConfig::WS(lisc) => {
-            let lis = <WebSocketConfig as WithTransport<L, C>>::apply_to_lis(
-                lisc, lis,
+        TransportConfig::WS(connc) => {
+            let conn = <WebSocketConfig as WithTransport<L, C>>::apply_to_conn(
+                connc, conn,
             );
-            spawn_conn_half_with_trans(workers, conn_trans, lis, conn);
+            spawn_lis_half_with_trans(workers, lis_trans, lis, conn);
         }
-        TransportConfig::H2(lisc) => {
-            let lis =
-                <HTTP2Config as WithTransport<L, C>>::apply_to_lis(lisc, lis);
-            spawn_conn_half_with_trans(workers, conn_trans, lis, conn);
+        TransportConfig::H2(connc) => {
+            let conn = <HTTP2Config as WithTransport<L, C>>::apply_to_conn(
+                connc, conn,
+            );
+            spawn_lis_half_with_trans(workers, lis_trans, lis, conn);
         }
     }
 }
@@ -156,14 +156,14 @@ fn spawn_with_tls(
 ) {
     match &listen.tls {
         TLSConfig::Server(lisc) => match &remote.tls {
-            TLSConfig::Client(connc) => spawn_lis_half_with_trans(
+            TLSConfig::Client(connc) => spawn_conn_half_with_trans(
                 workers,
                 &listen.trans,
                 &remote.trans,
                 lisc.apply_to_lis(lis),
                 connc.apply_to_conn(conn),
             ),
-            _ => spawn_lis_half_with_trans(
+            _ => spawn_conn_half_with_trans(
                 workers,
                 &listen.trans,
                 &remote.trans,
@@ -172,7 +172,7 @@ fn spawn_with_tls(
             ),
         },
         _ => match &remote.tls {
-            TLSConfig::Client(connc) => spawn_lis_half_with_trans(
+            TLSConfig::Client(connc) => spawn_conn_half_with_trans(
                 workers,
                 &listen.trans,
                 &remote.trans,
@@ -180,7 +180,7 @@ fn spawn_with_tls(
                 connc.apply_to_conn(conn),
             ),
 
-            _ => spawn_lis_half_with_trans(
+            _ => spawn_conn_half_with_trans(
                 workers,
                 &listen.trans,
                 &remote.trans,
