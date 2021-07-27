@@ -33,6 +33,7 @@ pub trait AsyncConnect: Send + Sync + Unpin + Clone {
 pub trait AsyncAccept: Send + Sync + Unpin + Clone {
     const TRANS: Transport;
     const SCHEME: &'static str;
+    const MUX: bool;
     type IO: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static;
     fn addr(&self) -> &CommonAddr;
     async fn accept(

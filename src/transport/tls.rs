@@ -66,6 +66,8 @@ impl<T: AsyncAccept> Acceptor<T> {
 
 #[async_trait]
 impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
+    const MUX: bool = false;
+
     const TRANS: Transport = Transport::TLS;
 
     const SCHEME: &'static str = "tls";

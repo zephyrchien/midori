@@ -7,7 +7,6 @@ use futures::ready;
 
 use bytes::{Bytes, BytesMut};
 use http::{Uri, Version, StatusCode, Request, Response};
-use http::uri::{Parts, PathAndQuery};
 use tokio::io::{AsyncRead, AsyncWrite};
 use h2::{client, server};
 use h2::{SendStream, RecvStream};
@@ -177,7 +176,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
             .map_err(|e| utils::new_io_err(&e.to_string()))?;
 
         // request with a send stream
-        let (mut response, send) = client
+        let (response, send) = client
             .send_request(
                 Request::builder()
                     .uri(&self.uri)
@@ -188,9 +187,11 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
             )
             .map_err(|e| utils::new_io_err(&e.to_string()))?;
 
+        /*
         // prepare to recv server push
         let mut pushes = response.push_promises();
         let push = pushes.push_promise();
+        */
 
         // get recv stream from response body
         let recv = response
@@ -198,6 +199,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
             .map_err(|e| utils::new_io_err(&e.to_string()))?
             .into_body();
 
+        /*
         // try recv stream from push body
         // NOT SOLVED:
         // ALWAYS HANG when try to
@@ -217,6 +219,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
                 }
             }
         }
+        */
 
         // fallback
         Ok(H2Stream::new(recv, send, BytesMut::with_capacity(4096)))
@@ -243,6 +246,8 @@ impl<T: AsyncAccept> Acceptor<T> {
 
 #[async_trait]
 impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
+    const MUX: bool = true;
+
     const TRANS: Transport = Transport::H2;
 
     const SCHEME: &'static str = match T::TRANS {
@@ -288,8 +293,9 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
         }
 
         // get recv stream from request body
-        let (parts, recv) = request.into_parts();
+        let (_, recv) = request.into_parts();
 
+        /*
         // prepare server push
         let mut pushed_uri_parts: Parts = parts.uri.into();
         pushed_uri_parts.path_and_query =
@@ -300,6 +306,7 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
                 .body(())
                 .unwrap(),
         );
+        */
 
         // respond a send stream
         let send = response
@@ -309,6 +316,7 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
             )
             .map_err(|e| utils::new_io_err(&e.to_string()))?;
 
+        /*
         // try server push
         if self.server_push {
             if let Ok(mut push) = push {
@@ -325,6 +333,7 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
                 }
             }
         }
+        */
 
         // fallback
         Ok((

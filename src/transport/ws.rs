@@ -223,6 +223,8 @@ impl Callback for RequestHook {
 
 #[async_trait]
 impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
+    const MUX: bool = false;
+
     const TRANS: Transport = Transport::WS;
 
     const SCHEME: &'static str = match T::TRANS {

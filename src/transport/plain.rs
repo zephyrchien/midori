@@ -294,6 +294,8 @@ impl Acceptor {
 
 #[async_trait]
 impl AsyncAccept for Acceptor {
+    const MUX: bool = false;
+
     const TRANS: Transport = Transport::TCP;
 
     const SCHEME: &'static str = "tcp";
