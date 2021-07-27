@@ -265,7 +265,6 @@ impl PlainListener {
     }
     pub async fn accept_plain(&self) -> io::Result<(PlainStream, SocketAddr)> {
         #[cfg(unix)]
-        use std::net::{IpAddr, Ipv4Addr};
         Ok(match self {
             PlainListener::TCP(x) => {
                 let (stream, sockaddr) = x.accept().await?;
@@ -275,8 +274,7 @@ impl PlainListener {
             #[cfg(unix)]
             PlainListener::UDS(x) => {
                 let (stream, _) = x.accept().await?;
-                let sockaddr =
-                    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
+                let sockaddr = utils::empty_sockaddr();
                 (PlainStream::UDS(stream), sockaddr)
             }
         })

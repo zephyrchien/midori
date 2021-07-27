@@ -15,7 +15,7 @@ use async_trait::async_trait;
 
 use super::{AsyncConnect, AsyncAccept, IOStream, Transport};
 use super::plain::PlainStream;
-use crate::utils::{self, CommonAddr};
+use crate::utils::{self, CommonAddr, H2_BUF_SIZE};
 
 pub struct H2Stream {
     recv: RecvStream,
@@ -214,7 +214,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
                     return Ok(H2Stream::new(
                         recv,
                         send,
-                        BytesMut::with_capacity(4096),
+                        BytesMut::with_capacity(H2_BUF_SIZE),
                     ));
                 }
             }
@@ -222,7 +222,11 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
         */
 
         // fallback
-        Ok(H2Stream::new(recv, send, BytesMut::with_capacity(4096)))
+        Ok(H2Stream::new(
+            recv,
+            send,
+            BytesMut::with_capacity(H2_BUF_SIZE),
+        ))
     }
 }
 
@@ -326,7 +330,7 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
                         H2Stream::new(
                             recv,
                             send,
-                            BytesMut::with_capacity(4096),
+                            BytesMut::with_capacity(H2_BUF_SIZE),
                         ),
                         addr,
                     ));
@@ -337,7 +341,7 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
 
         // fallback
         Ok((
-            H2Stream::new(recv, send, BytesMut::with_capacity(4096)),
+            H2Stream::new(recv, send, BytesMut::with_capacity(H2_BUF_SIZE)),
             addr,
         ))
     }

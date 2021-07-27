@@ -19,7 +19,7 @@ use async_trait::async_trait;
 
 use super::{AsyncConnect, AsyncAccept, IOStream, Transport};
 use super::plain::PlainStream;
-use crate::utils::{self, CommonAddr};
+use crate::utils::{self, CommonAddr, WS_BUF_SIZE};
 
 pub struct WSStream<S> {
     io: WebSocketStream<S>,
@@ -32,7 +32,7 @@ impl<S> WSStream<S> {
     pub fn new(io: WebSocketStream<S>) -> Self {
         WSStream {
             io,
-            buffer: BytesMut::with_capacity(4096),
+            buffer: BytesMut::with_capacity(WS_BUF_SIZE),
         }
     }
 }
