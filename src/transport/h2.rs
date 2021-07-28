@@ -7,12 +7,11 @@ use std::sync::{Arc, RwLock};
 use futures::ready;
 
 use bytes::{Bytes, BytesMut};
-use h2::client::SendRequest;
-use h2::server::SendResponse;
 use http::{Uri, Version, StatusCode, Request, Response};
 use tokio::io::{AsyncRead, AsyncWrite};
-use h2::{client, server};
 use h2::{SendStream, RecvStream};
+use h2::client::{self, SendRequest};
+use h2::server::{self, SendResponse};
 
 use async_trait::async_trait;
 
@@ -52,8 +51,7 @@ impl AsyncRead for H2Stream {
             return Poll::Ready(Ok(()));
         };
         Poll::Ready(match ready!(self.recv.poll_data(cx)) {
-            Some(data) => {
-                let data = data.unwrap();
+            Some(Ok(data)) => {
                 let to_read = min(buf.remaining(), data.len());
                 buf.put_slice(&data[..to_read]);
                 // copy the left payload into buffer
@@ -68,7 +66,8 @@ impl AsyncRead for H2Stream {
             }
             // no more data frames
             // maybe trailer
-            None => Ok(()),
+            // or cancelled
+            _ => Ok(()),
         })
     }
 }
@@ -211,7 +210,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
             }
         }
         */
-
+        println!("{:#?}\n{:#?}", recv.stream_id(), send.stream_id());
         // fallback
         Ok(H2Stream::new(
             recv,
