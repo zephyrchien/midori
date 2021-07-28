@@ -39,8 +39,15 @@
 [h2-doc-url]: https://github.com/zephyrchien/midori/blob/master/docs/h2.md
 
 ## Usage
-```bash
-midori -c config.json
+```shell
+midori [OPTIONS] [SUBCOMMAND]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+    -c, --config <file>    specify a config file
 ```
 
 ## Quick Start
