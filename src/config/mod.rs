@@ -39,4 +39,5 @@ where
 
     fn apply_to_lis(&self, lis: L) -> Self::Acceptor;
     fn apply_to_conn(&self, conn: C) -> Self::Connector;
+    fn apply_to_lis_with_conn(&self, conn: C, lis: L) -> Self::Acceptor;
 }

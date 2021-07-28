@@ -2,7 +2,7 @@ use std::io;
 use std::net::SocketAddr;
 use futures::try_join;
 
-use super::copy;
+use crate::io::copy;
 use crate::transport::plain::{PlainStream, PlainListener};
 use crate::transport::{AsyncConnect, AsyncAccept};
 
@@ -18,7 +18,7 @@ where
     let ((sin, _), sout) = try_join!(lis.accept(res), conn.connect())?;
     let (ri, wi) = tokio::io::split(sin);
     let (ro, wo) = tokio::io::split(sout);
-    let _ = try_join!(copy::copy(ri, wo), copy::copy(ro, wi));
+    let _ = try_join!(copy(ri, wo), copy(ro, wi));
     Ok(())
 }
 
@@ -44,12 +44,12 @@ async fn bidi_zero_copy(
     mut sin: PlainStream,
     conn: plain::Connector,
 ) -> io::Result<()> {
-    use super::zero_copy;
+    use crate::io::zero_copy;
     let mut sout = conn.connect().await?;
     let (ri, wi) = plain::linux_ext::split(&mut sin);
     let (ro, wo) = plain::linux_ext::split(&mut sout);
 
-    let _ = try_join!(zero_copy::copy(ri, wo), zero_copy::copy(ro, wi));
+    let _ = try_join!(zero_copy(ri, wo), zero_copy(ro, wi));
 
     Ok(())
 }

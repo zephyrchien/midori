@@ -41,23 +41,31 @@ where
     fn apply_to_lis(&self, lis: L) -> Self::Acceptor {
         ws::Acceptor::new(lis, self.path.clone())
     }
+
     fn apply_to_conn(&self, conn: C) -> Self::Connector {
         ws::Connector::new(conn, self.path.clone())
+    }
+
+    fn apply_to_lis_with_conn(&self, _: C, _: L) -> Self::Acceptor {
+        unreachable!()
     }
 }
 
 impl<L, C> WithTransport<L, C> for HTTP2Config
 where
     L: AsyncAccept,
-    C: AsyncConnect,
+    C: AsyncConnect + 'static,
 {
-    type Acceptor = h2::Acceptor<L>;
+    type Acceptor = h2::Acceptor<L, C>;
     type Connector = h2::Connector<C>;
 
-    fn apply_to_lis(&self, lis: L) -> Self::Acceptor {
-        h2::Acceptor::new(lis, self.path.clone(), self.server_push)
-    }
+    fn apply_to_lis(&self, _: L) -> Self::Acceptor { unreachable!() }
+
     fn apply_to_conn(&self, conn: C) -> Self::Connector {
         h2::Connector::new(conn, self.path.clone(), self.server_push)
+    }
+
+    fn apply_to_lis_with_conn(&self, conn: C, lis: L) -> Self::Acceptor {
+        h2::Acceptor::new(conn, lis, self.path.clone(), self.server_push)
     }
 }

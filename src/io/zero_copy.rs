@@ -54,7 +54,10 @@ fn is_wouldblock() -> bool {
 }
 
 // tokio >= 1.9.0
-pub async fn copy(r: ReadHalf<'_>, mut w: WriteHalf<'_>) -> io::Result<()> {
+pub async fn zero_copy(
+    r: ReadHalf<'_>,
+    mut w: WriteHalf<'_>,
+) -> io::Result<()> {
     // init pipe
     let pipe = Pipe::create()?;
     let (rpipe, wpipe) = (pipe.0, pipe.1);
@@ -109,7 +112,7 @@ pub async fn copy(r: ReadHalf<'_>, mut w: WriteHalf<'_>) -> io::Result<()> {
 
 // before tokio 1.9.0
 /*
-pub async fn copy<X, Y, R, W>(mut r: R, mut w: W) -> io::Result<()>
+pub async fn zero_copy<X, Y, R, W>(mut r: R, mut w: W) -> io::Result<()>
 where
     X: AsRawFd,
     Y: AsRawFd,

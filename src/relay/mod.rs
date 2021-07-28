@@ -4,6 +4,8 @@ use futures::future::join_all;
 
 use tokio::task::JoinHandle;
 
+mod stream;
+
 use crate::dns;
 use crate::utils::{self, CommonAddr};
 use crate::config::{
@@ -12,12 +14,6 @@ use crate::config::{
 };
 use crate::transport::plain;
 use crate::transport::{AsyncConnect, AsyncAccept};
-
-mod copy;
-mod stream;
-
-#[cfg(target_os = "linux")]
-mod zero_copy;
 
 fn parse_domain_name(s: &str) -> Option<(String, u16)> {
     let mut iter = s.splitn(2, ':');
@@ -112,7 +108,11 @@ fn spawn_lis_half_with_trans<L, C>(
         }
         TransportConfig::H2(lisc) => {
             let lis =
-                <HTTP2Config as WithTransport<L, C>>::apply_to_lis(lisc, lis);
+                <HTTP2Config as WithTransport<L, C>>::apply_to_lis_with_conn(
+                    lisc,
+                    conn.clone(),
+                    lis,
+                );
             workers.push(tokio::spawn(stream::proxy(lis, conn)));
         }
     }

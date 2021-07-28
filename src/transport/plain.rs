@@ -264,7 +264,6 @@ impl PlainListener {
         })
     }
     pub async fn accept_plain(&self) -> io::Result<(PlainStream, SocketAddr)> {
-        #[cfg(unix)]
         Ok(match self {
             PlainListener::TCP(x) => {
                 let (stream, sockaddr) = x.accept().await?;

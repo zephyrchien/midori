@@ -3,9 +3,12 @@ use std::cmp::min;
 use std::pin::Pin;
 use std::task::{Poll, Context};
 use std::net::SocketAddr;
+use std::sync::{Arc, RwLock};
 use futures::ready;
 
 use bytes::{Bytes, BytesMut};
+use h2::client::SendRequest;
+use h2::server::SendResponse;
 use http::{Uri, Version, StatusCode, Request, Response};
 use tokio::io::{AsyncRead, AsyncWrite};
 use h2::{client, server};
@@ -127,6 +130,7 @@ pub struct Connector<T: AsyncConnect> {
     cc: T,
     uri: Uri,
     allow_push: bool,
+    channel: Arc<RwLock<Option<SendRequest<Bytes>>>>,
 }
 
 impl<T: AsyncConnect> Connector<T> {
@@ -141,6 +145,7 @@ impl<T: AsyncConnect> Connector<T> {
                 .build()
                 .unwrap(),
             allow_push,
+            channel: Arc::new(RwLock::new(None)),
         }
     }
 }
@@ -159,24 +164,10 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
 
     async fn connect(&self) -> io::Result<Self::IO> {
-        let stream = self.cc.connect().await?;
-        // establish a new connection
-        let (h2, conn) = client::Builder::new()
-            .enable_push(self.allow_push)
-            .handshake(stream)
-            .await
-            .map_err(|e| utils::new_io_err(&e.to_string()))?;
-
-        tokio::spawn(conn);
-
-        // create a new stream
-        let mut client = h2
-            .ready()
-            .await
-            .map_err(|e| utils::new_io_err(&e.to_string()))?;
+        let mut channel = new_channel(self).await?;
 
         // request with a send stream
-        let (response, send) = client
+        let (response, send) = channel
             .send_request(
                 Request::builder()
                     .uri(&self.uri)
@@ -230,17 +221,53 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     }
 }
 
+async fn new_channel<T: AsyncConnect>(
+    cc: &Connector<T>,
+) -> io::Result<SendRequest<Bytes>> {
+    // reuse existed connection
+    let channel = (*cc.channel.read().unwrap()).clone();
+    if let Some(channel) = channel {
+        if let Ok(channel) = channel.ready().await {
+            return Ok(channel);
+        };
+    };
+
+    // establish a new connection
+    let stream = cc.cc.connect().await?;
+    let (channel, conn) = client::Builder::new()
+        .enable_push(cc.allow_push)
+        .handshake(stream)
+        .await
+        .map_err(|e| utils::new_io_err(&e.to_string()))?;
+
+    // store connection
+    // may have conflicts
+    *cc.channel.write().unwrap() = Some(channel.clone());
+    tokio::spawn(conn);
+
+    channel
+        .ready()
+        .await
+        .map_err(|e| utils::new_io_err(&e.to_string()))
+}
+
 // HTTP2 Acceptor
 #[derive(Clone)]
-pub struct Acceptor<T: AsyncAccept> {
-    lis: T,
+pub struct Acceptor<L: AsyncAccept, C: AsyncConnect> {
+    cc: C,
+    lis: L,
     path: String,
     server_push: bool,
 }
 
-impl<T: AsyncAccept> Acceptor<T> {
-    pub fn new(lis: T, path: String, server_push: bool) -> Self {
+impl<L, C> Acceptor<L, C>
+where
+    L: AsyncAccept,
+    C: AsyncConnect,
+{
+    pub fn new(cc: C, lis: L, path: String, server_push: bool) -> Self {
         Acceptor {
+            cc,
             lis,
             path,
             server_push,
@@ -249,12 +276,16 @@ impl<T: AsyncAccept> Acceptor<T> {
 }
 
 #[async_trait]
-impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
+impl<L, C> AsyncAccept for Acceptor<L, C>
+where
+    L: AsyncAccept,
+    C: AsyncConnect + 'static,
+{
     const MUX: bool = true;
 
     const TRANS: Transport = Transport::H2;
 
-    const SCHEME: &'static str = match T::TRANS {
+    const SCHEME: &'static str = match L::TRANS {
         Transport::TLS => "https",
         _ => "http",
     };
@@ -274,75 +305,112 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
             .map_err(|e| utils::new_io_err(&e.to_string()))?;
 
         // accept a new stream
-        let (request, mut response) = conn
+        let (request, response) = conn
             .accept()
             .await
             .unwrap()
             .map_err(|e| utils::new_io_err(&e.to_string()))?;
 
-        tokio::spawn(async move {
-            conn.accept().await;
-        });
+        // handle the initial request
+        let h2_stream = handle_request(&self.path, request, response).await?;
 
-        // check request path
-        if request.uri().path() != self.path {
-            let _ = response.send_response(
-                Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .body(())
-                    .unwrap(),
-                true,
-            );
-            return Err(utils::new_io_err("invalid path"));
-        }
+        // handle next mux requests
+        tokio::spawn(handle_mux_conn(self.cc.clone(), conn, self.path.clone()));
 
-        // get recv stream from request body
-        let (_, recv) = request.into_parts();
+        Ok((h2_stream, addr))
+    }
+}
 
-        /*
-        // prepare server push
-        let mut pushed_uri_parts: Parts = parts.uri.into();
-        pushed_uri_parts.path_and_query =
-            PathAndQuery::from_static("/push").into();
-        let push = response.push_request(
-            Request::builder()
-                .uri(Uri::from_parts(pushed_uri_parts).unwrap())
+async fn handle_request(
+    path: &str,
+    request: Request<RecvStream>,
+    mut response: SendResponse<Bytes>,
+) -> io::Result<H2Stream> {
+    // check request path
+    if request.uri().path() != path {
+        let _ = response.send_response(
+            Response::builder()
+                .status(StatusCode::NOT_FOUND)
                 .body(())
                 .unwrap(),
+            true,
         );
-        */
+        return Err(utils::new_io_err("invalid path"));
+    }
 
-        // respond a send stream
-        let send = response
-            .send_response(
-                Response::builder().status(StatusCode::OK).body(()).unwrap(),
-                false,
-            )
-            .map_err(|e| utils::new_io_err(&e.to_string()))?;
+    // get recv stream from request body
+    let (_, recv) = request.into_parts();
 
-        /*
-        // try server push
-        if self.server_push {
-            if let Ok(mut push) = push {
-                let send = push.send_response(Response::new(()), false);
-                if let Ok(send) = send {
-                    return Ok((
-                        H2Stream::new(
-                            recv,
-                            send,
-                            BytesMut::with_capacity(H2_BUF_SIZE),
-                        ),
-                        addr,
-                    ));
-                }
+    /*
+    // prepare server push
+    let mut pushed_uri_parts: Parts = parts.uri.into();
+    pushed_uri_parts.path_and_query =
+        PathAndQuery::from_static("/push").into();
+    let push = response.push_request(
+        Request::builder()
+            .uri(Uri::from_parts(pushed_uri_parts).unwrap())
+            .body(())
+            .unwrap(),
+    );
+    */
+
+    // respond a send stream
+    let send = response
+        .send_response(
+            Response::builder().status(StatusCode::OK).body(()).unwrap(),
+            false,
+        )
+        .map_err(|e| utils::new_io_err(&e.to_string()))?;
+
+    /*
+    // try server push
+    if self.server_push {
+        if let Ok(mut push) = push {
+            let send = push.send_response(Response::new(()), false);
+            if let Ok(send) = send {
+                return Ok((
+                    H2Stream::new(
+                        recv,
+                        send,
+                        BytesMut::with_capacity(H2_BUF_SIZE),
+                    ),
+                    addr,
+                ));
             }
         }
-        */
-
-        // fallback
-        Ok((
-            H2Stream::new(recv, send, BytesMut::with_capacity(H2_BUF_SIZE)),
-            addr,
-        ))
     }
+    */
+    Ok(H2Stream::new(
+        recv,
+        send,
+        BytesMut::with_capacity(H2_BUF_SIZE),
+    ))
+}
+
+async fn handle_mux_conn<C, IO>(
+    cc: C,
+    mut conn: server::Connection<IO, Bytes>,
+    path: String,
+) where
+    C: AsyncConnect + 'static,
+    IO: AsyncRead + AsyncWrite + Unpin,
+{
+    while let Some(Ok((request, response))) = conn.accept().await {
+        if let Ok(stream) = handle_request(&path, request, response).await {
+            tokio::spawn(proxy(cc.clone(), stream));
+        }
+    }
+}
+
+async fn proxy<C>(cc: C, sin: H2Stream) -> io::Result<()>
+where
+    C: AsyncConnect + 'static,
+{
+    use futures::try_join;
+    use crate::io::copy;
+    let sout = cc.connect().await?;
+    let (ri, wi) = tokio::io::split(sin);
+    let (ro, wo) = tokio::io::split(sout);
+    let _ = try_join!(copy(ri, wo), copy(ro, wi));
+    Ok(())
 }

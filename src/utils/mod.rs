@@ -23,6 +23,7 @@ pub unsafe fn const_cast<T>(x: &T) -> &mut T {
     &mut *mut_ptr
 }
 
+#[allow(dead_code)]
 #[inline]
 pub fn empty_sockaddr() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0)
