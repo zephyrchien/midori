@@ -3,7 +3,7 @@ use std::cmp::min;
 use std::pin::Pin;
 use std::task::{Poll, Context};
 use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 use futures::ready;
 
 use bytes::{Bytes, BytesMut};
@@ -123,18 +123,41 @@ impl AsyncWrite for H2Stream {
     }
 }
 
+#[derive(Clone)]
+struct Channel {
+    count: usize,
+    client: SendRequest<Bytes>,
+}
+
+impl Channel {
+    fn new(client: SendRequest<Bytes>) -> Channel {
+        Channel { count: 1, client }
+    }
+}
+
 // HTTP2 Connector
 #[derive(Clone)]
 pub struct Connector<T: AsyncConnect> {
     cc: T,
     uri: Uri,
     allow_push: bool,
-    channel: Arc<RwLock<Option<SendRequest<Bytes>>>>,
+    max_concurrent: usize,
+    channel: Arc<Mutex<Option<Channel>>>,
 }
 
 impl<T: AsyncConnect> Connector<T> {
-    pub fn new(cc: T, path: String, allow_push: bool) -> Self {
+    pub fn new(
+        cc: T,
+        path: String,
+        allow_push: bool,
+        max_concurrent: usize,
+    ) -> Self {
         let authority = cc.addr().to_string();
+        let max_concurrent = if max_concurrent == 0 {
+            1000
+        } else {
+            max_concurrent
+        };
         Connector {
             cc,
             uri: Uri::builder()
@@ -144,7 +167,8 @@ impl<T: AsyncConnect> Connector<T> {
                 .build()
                 .unwrap(),
             allow_push,
-            channel: Arc::new(RwLock::new(None)),
+            max_concurrent,
+            channel: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -163,10 +187,10 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
 
     async fn connect(&self) -> io::Result<Self::IO> {
-        let mut channel = new_channel(self).await?;
+        let mut client = new_client(self).await?;
 
         // request with a send stream
-        let (response, send) = channel
+        let (response, send) = client
             .send_request(
                 Request::builder()
                     .uri(&self.uri)
@@ -210,7 +234,6 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
             }
         }
         */
-        println!("{:#?}\n{:#?}", recv.stream_id(), send.stream_id());
         // fallback
         Ok(H2Stream::new(
             recv,
@@ -220,20 +243,26 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     }
 }
 
-async fn new_channel<T: AsyncConnect>(
+async fn new_client<T: AsyncConnect>(
     cc: &Connector<T>,
 ) -> io::Result<SendRequest<Bytes>> {
     // reuse existed connection
-    let channel = (*cc.channel.read().unwrap()).clone();
+    let channel = (*cc.channel.lock().unwrap()).clone();
     if let Some(channel) = channel {
-        if let Ok(channel) = channel.ready().await {
-            return Ok(channel);
+        if channel.count < cc.max_concurrent {
+            if let Ok(client) = channel.client.ready().await {
+                match cc.channel.lock().unwrap().as_mut() {
+                    Some(x) => x.count += 1,
+                    None => unreachable!(),
+                };
+                return Ok(client);
+            };
         };
     };
 
     // establish a new connection
     let stream = cc.cc.connect().await?;
-    let (channel, conn) = client::Builder::new()
+    let (client, conn) = client::Builder::new()
         .enable_push(cc.allow_push)
         .handshake(stream)
         .await
@@ -241,10 +270,10 @@ async fn new_channel<T: AsyncConnect>(
 
     // store connection
     // may have conflicts
-    *cc.channel.write().unwrap() = Some(channel.clone());
+    *cc.channel.lock().unwrap() = Some(Channel::new(client.clone()));
     tokio::spawn(conn);
 
-    channel
+    client
         .ready()
         .await
         .map_err(|e| utils::new_io_err(&e.to_string()))

@@ -28,6 +28,8 @@ pub struct HTTP2Config {
 
     #[serde(default)]
     pub server_push: bool,
+    #[serde(default)]
+    pub mux: usize,
 }
 
 impl<L, C> WithTransport<L, C> for WebSocketConfig
@@ -62,7 +64,7 @@ where
     fn apply_to_lis(&self, _: L) -> Self::Acceptor { unreachable!() }
 
     fn apply_to_conn(&self, conn: C) -> Self::Connector {
-        h2::Connector::new(conn, self.path.clone(), self.server_push)
+        h2::Connector::new(conn, self.path.clone(), self.server_push, self.mux)
     }
 
     fn apply_to_lis_with_conn(&self, conn: C, lis: L) -> Self::Acceptor {
