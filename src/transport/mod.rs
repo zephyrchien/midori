@@ -8,7 +8,6 @@ pub mod plain;
 pub mod ws;
 pub mod h2;
 pub mod tls;
-use plain::PlainStream;
 
 trait IOStream: AsyncRead + AsyncWrite + Send + Sync + Unpin {}
 
@@ -21,7 +20,7 @@ pub enum Transport {
 }
 
 #[async_trait]
-pub trait AsyncConnect: Send + Sync + Unpin + Clone {
+pub trait AsyncConnect: Send + Sync + Unpin {
     const TRANS: Transport;
     const SCHEME: &'static str;
     type IO: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static;
@@ -30,15 +29,14 @@ pub trait AsyncConnect: Send + Sync + Unpin + Clone {
 }
 
 #[async_trait]
-pub trait AsyncAccept: Send + Sync + Unpin + Clone {
+pub trait AsyncAccept: Send + Sync + Unpin {
     const TRANS: Transport;
     const SCHEME: &'static str;
-    const MUX: bool;
     type IO: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static;
+    type Base: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static;
     fn addr(&self) -> &CommonAddr;
-    async fn accept(
-        &self,
-        // this is only used by the initial accept
-        res: (PlainStream, SocketAddr),
-    ) -> io::Result<(Self::IO, SocketAddr)>;
+    // initial accept
+    async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)>;
+    // protocol handshake
+    async fn accept(&self, base: Self::Base) -> io::Result<Self::IO>;
 }

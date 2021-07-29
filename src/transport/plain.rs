@@ -220,6 +220,7 @@ impl AsyncConnect for Connector {
 
     type IO = PlainStream;
 
+    #[inline]
     fn addr(&self) -> &CommonAddr { &self.addr }
 
     async fn connect(&self) -> io::Result<Self::IO> {
@@ -280,32 +281,38 @@ impl PlainListener {
     }
 }
 
-#[derive(Clone)]
 pub struct Acceptor {
+    lis: PlainListener,
     addr: CommonAddr,
 }
 
 impl Acceptor {
-    pub fn new(addr: CommonAddr) -> Self { Acceptor { addr } }
+    pub fn new(lis: PlainListener, addr: CommonAddr) -> Self {
+        Acceptor { lis, addr }
+    }
+    #[inline]
+    pub fn inner(&self) -> &PlainListener { &self.lis }
 }
 
 #[async_trait]
 impl AsyncAccept for Acceptor {
-    const MUX: bool = false;
-
     const TRANS: Transport = Transport::TCP;
 
     const SCHEME: &'static str = "tcp";
 
     type IO = PlainStream;
+    type Base = PlainStream;
 
+    #[inline]
     fn addr(&self) -> &CommonAddr { &self.addr }
 
-    async fn accept(
-        &self,
-        res: (PlainStream, SocketAddr),
-    ) -> io::Result<(Self::IO, SocketAddr)> {
+    #[inline]
+    async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
+        self.lis.accept_plain().await
+    }
+
+    async fn accept(&self, base: Self::Base) -> io::Result<Self::IO> {
         // fake accept
-        Ok(res)
+        Ok(base)
     }
 }

@@ -1,4 +1,5 @@
 use std::fs;
+use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 use crate::transport::plain;
 use crate::transport::{AsyncConnect, AsyncAccept};
@@ -39,5 +40,5 @@ where
 
     fn apply_to_lis(&self, lis: L) -> Self::Acceptor;
     fn apply_to_conn(&self, conn: C) -> Self::Connector;
-    fn apply_to_lis_with_conn(&self, conn: C, lis: L) -> Self::Acceptor;
+    fn apply_to_lis_with_conn(&self, conn: Arc<C>, lis: L) -> Self::Acceptor;
 }

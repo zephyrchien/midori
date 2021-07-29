@@ -1,5 +1,6 @@
 use std::io;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use futures::future::join_all;
 
 use tokio::task::JoinHandle;
@@ -12,8 +13,8 @@ use crate::config::{
     EndpointConfig, EpHalfConfig, HTTP2Config, NetConfig, TLSConfig,
     TransportConfig, WebSocketConfig, WithTransport,
 };
-use crate::transport::plain;
 use crate::transport::{AsyncConnect, AsyncAccept};
+use crate::transport::plain::{self, PlainListener};
 
 fn parse_domain_name(s: &str) -> Option<(String, u16)> {
     let mut iter = s.splitn(2, ':');
@@ -65,12 +66,14 @@ fn new_plain_lis(addr: &str, net: &NetConfig) -> plain::Acceptor {
     match net {
         NetConfig::TCP => {
             let sockaddr = parse_socket_addr(addr, false).unwrap();
-            plain::Acceptor::new(sockaddr)
+            let lis = PlainListener::bind(&sockaddr).unwrap();
+            plain::Acceptor::new(lis, sockaddr)
         }
         #[cfg(unix)]
         NetConfig::UDS => {
             let path = CommonAddr::UnixSocketPath(PathBuf::from(addr));
-            plain::Acceptor::new(path)
+            let lis = PlainListener::bind(&path).unwrap();
+            plain::Acceptor::new(lis, path)
         }
         NetConfig::UDP => unreachable!(),
     }
@@ -98,22 +101,29 @@ fn spawn_lis_half_with_trans<L, C>(
 {
     match lis_trans {
         TransportConfig::Plain => {
-            workers.push(tokio::spawn(stream::proxy(lis, conn)));
+            workers.push(tokio::spawn(stream::proxy(
+                Arc::new(lis),
+                Arc::new(conn),
+            )));
         }
         TransportConfig::WS(lisc) => {
             let lis = <WebSocketConfig as WithTransport<L, C>>::apply_to_lis(
                 lisc, lis,
             );
-            workers.push(tokio::spawn(stream::proxy(lis, conn)));
+            workers.push(tokio::spawn(stream::proxy(
+                Arc::new(lis),
+                Arc::new(conn),
+            )));
         }
         TransportConfig::H2(lisc) => {
+            let conn = Arc::new(conn);
             let lis =
                 <HTTP2Config as WithTransport<L, C>>::apply_to_lis_with_conn(
                     lisc,
                     conn.clone(),
                     lis,
                 );
-            workers.push(tokio::spawn(stream::proxy(lis, conn)));
+            workers.push(tokio::spawn(stream::proxy(Arc::new(lis), conn)));
         }
     }
 }

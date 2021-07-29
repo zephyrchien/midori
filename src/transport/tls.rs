@@ -11,10 +11,8 @@ pub use tokio_rustls::client::TlsStream as ClientTLSStream;
 pub use tokio_rustls::server::TlsStream as ServerTLSStream;
 
 use super::{AsyncConnect, AsyncAccept, Transport};
-use super::plain::PlainStream;
 use crate::utils::{self, CommonAddr};
 
-#[derive(Clone)]
 pub struct Connector<T: AsyncConnect> {
     cc: T,
     sni: DNSName,
@@ -40,15 +38,16 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
 
     type IO = ClientTLSStream<T::IO>;
 
+    #[inline]
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
 
+    #[inline]
     async fn connect(&self) -> io::Result<Self::IO> {
         let stream = self.cc.connect().await?;
         self.tls.connect(self.sni.as_ref(), stream).await
     }
 }
 
-#[derive(Clone)]
 pub struct Acceptor<T: AsyncAccept> {
     lis: T,
     // includes inner tls config
@@ -66,21 +65,25 @@ impl<T: AsyncAccept> Acceptor<T> {
 
 #[async_trait]
 impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
-    const MUX: bool = false;
-
     const TRANS: Transport = Transport::TLS;
 
     const SCHEME: &'static str = "tls";
 
     type IO = ServerTLSStream<T::IO>;
 
+    type Base = T::Base;
+
+    #[inline]
     fn addr(&self) -> &utils::CommonAddr { self.lis.addr() }
 
-    async fn accept(
-        &self,
-        res: (PlainStream, SocketAddr),
-    ) -> io::Result<(Self::IO, SocketAddr)> {
-        let (stream, addr) = self.lis.accept(res).await?;
-        Ok((self.tls.accept(stream).await?, addr))
+    #[inline]
+    async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
+        self.lis.accept_base().await
+    }
+
+    #[inline]
+    async fn accept(&self, base: Self::Base) -> io::Result<Self::IO> {
+        let stream = self.lis.accept(base).await?;
+        Ok(self.tls.accept(stream).await?)
     }
 }

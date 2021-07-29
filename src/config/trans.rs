@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{Serialize, Deserialize};
 
 use super::WithTransport;
@@ -48,7 +50,7 @@ where
         ws::Connector::new(conn, self.path.clone())
     }
 
-    fn apply_to_lis_with_conn(&self, _: C, _: L) -> Self::Acceptor {
+    fn apply_to_lis_with_conn(&self, _: Arc<C>, _: L) -> Self::Acceptor {
         unreachable!()
     }
 }
@@ -67,7 +69,7 @@ where
         h2::Connector::new(conn, self.path.clone(), self.server_push, self.mux)
     }
 
-    fn apply_to_lis_with_conn(&self, conn: C, lis: L) -> Self::Acceptor {
+    fn apply_to_lis_with_conn(&self, conn: Arc<C>, lis: L) -> Self::Acceptor {
         h2::Acceptor::new(conn, lis, self.path.clone(), self.server_push)
     }
 }

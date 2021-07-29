@@ -16,7 +16,6 @@ use h2::server::{self, SendResponse};
 use async_trait::async_trait;
 
 use super::{AsyncConnect, AsyncAccept, IOStream, Transport};
-use super::plain::PlainStream;
 use crate::utils::{self, CommonAddr, H2_BUF_SIZE};
 
 pub struct H2Stream {
@@ -136,7 +135,6 @@ impl Channel {
 }
 
 // HTTP2 Connector
-#[derive(Clone)]
 pub struct Connector<T: AsyncConnect> {
     cc: T,
     uri: Uri,
@@ -184,8 +182,10 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
 
     type IO = H2Stream;
 
+    #[inline]
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
 
+    #[inline]
     async fn connect(&self) -> io::Result<Self::IO> {
         let mut client = new_client(self).await?;
 
@@ -280,11 +280,11 @@ async fn new_client<T: AsyncConnect>(
 }
 
 // HTTP2 Acceptor
-#[derive(Clone)]
 pub struct Acceptor<L: AsyncAccept, C: AsyncConnect> {
-    cc: C,
+    cc: Arc<C>,
     lis: L,
     path: String,
+    #[allow(dead_code)]
     server_push: bool,
 }
 
@@ -293,7 +293,7 @@ where
     L: AsyncAccept,
     C: AsyncConnect,
 {
-    pub fn new(cc: C, lis: L, path: String, server_push: bool) -> Self {
+    pub fn new(cc: Arc<C>, lis: L, path: String, server_push: bool) -> Self {
         Acceptor {
             cc,
             lis,
@@ -309,8 +309,6 @@ where
     L: AsyncAccept,
     C: AsyncConnect + 'static,
 {
-    const MUX: bool = true;
-
     const TRANS: Transport = Transport::H2;
 
     const SCHEME: &'static str = match L::TRANS {
@@ -320,13 +318,19 @@ where
 
     type IO = H2Stream;
 
+    type Base = L::Base;
+
+    #[inline]
     fn addr(&self) -> &CommonAddr { self.lis.addr() }
 
-    async fn accept(
-        &self,
-        res: (PlainStream, SocketAddr),
-    ) -> io::Result<(Self::IO, SocketAddr)> {
-        let (stream, addr) = self.lis.accept(res).await?;
+    #[inline]
+    async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
+        self.lis.accept_base().await
+    }
+
+    #[inline]
+    async fn accept(&self, base: Self::Base) -> io::Result<Self::IO> {
+        let stream = self.lis.accept(base).await?;
         // establish a new connection
         let mut conn = server::handshake(stream)
             .await
@@ -345,7 +349,7 @@ where
         // handle next mux requests
         tokio::spawn(handle_mux_conn(self.cc.clone(), conn, self.path.clone()));
 
-        Ok((h2_stream, addr))
+        Ok(h2_stream)
     }
 }
 
@@ -416,7 +420,7 @@ async fn handle_request(
 }
 
 async fn handle_mux_conn<C, IO>(
-    cc: C,
+    cc: Arc<C>,
     mut conn: server::Connection<IO, Bytes>,
     path: String,
 ) where
@@ -430,7 +434,7 @@ async fn handle_mux_conn<C, IO>(
     }
 }
 
-async fn proxy<C>(cc: C, sin: H2Stream) -> io::Result<()>
+async fn proxy<C>(cc: Arc<C>, sin: H2Stream) -> io::Result<()>
 where
     C: AsyncConnect + 'static,
 {

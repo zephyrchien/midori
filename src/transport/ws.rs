@@ -18,7 +18,6 @@ use tungstenite::handshake::server::{Callback, Request, Response, ErrorResponse}
 use async_trait::async_trait;
 
 use super::{AsyncConnect, AsyncAccept, IOStream, Transport};
-use super::plain::PlainStream;
 use crate::utils::{self, CommonAddr, WS_BUF_SIZE};
 
 pub struct WSStream<S> {
@@ -128,7 +127,6 @@ where
 }
 
 // WebSocket Connector
-#[derive(Clone)]
 pub struct Connector<T: AsyncConnect> {
     cc: T,
     uri: Uri,
@@ -162,8 +160,10 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
 
     type IO = WSStream<T::IO>;
 
+    #[inline]
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
 
+    #[inline]
     async fn connect(&self) -> io::Result<Self::IO> {
         let stream = self.cc.connect().await?;
         tokio_tungstenite::client_async_with_config(
@@ -183,7 +183,6 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
 }
 
 // WebSocket Acceptor
-#[derive(Clone)]
 pub struct Acceptor<T: AsyncAccept> {
     lis: T,
     path: String,
@@ -223,8 +222,6 @@ impl Callback for RequestHook {
 
 #[async_trait]
 impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
-    const MUX: bool = false;
-
     const TRANS: Transport = Transport::WS;
 
     const SCHEME: &'static str = match T::TRANS {
@@ -234,13 +231,19 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
 
     type IO = WSStream<T::IO>;
 
+    type Base = T::Base;
+
+    #[inline]
     fn addr(&self) -> &CommonAddr { self.lis.addr() }
 
-    async fn accept(
-        &self,
-        res: (PlainStream, SocketAddr),
-    ) -> io::Result<(Self::IO, SocketAddr)> {
-        let (stream, addr) = self.lis.accept(res).await?;
+    #[inline]
+    async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
+        self.lis.accept_base().await
+    }
+
+    #[inline]
+    async fn accept(&self, base: Self::Base) -> io::Result<Self::IO> {
+        let stream = self.lis.accept(base).await?;
         let hook = RequestHook {
             path: self.path.clone(),
         };
@@ -252,7 +255,7 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
         .await
         .map_or_else(
             |e| Err(utils::new_io_err(&e.to_string())),
-            |ws| Ok((WSStream::new(ws), addr)),
+            |ws| Ok(WSStream::new(ws)),
         )
     }
 }
