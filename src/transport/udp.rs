@@ -15,24 +15,31 @@ use super::{AsyncAccept, AsyncConnect, IOStream, Transport};
 use crate::dns;
 use crate::utils::{self, CommonAddr, UDP_BUF_SIZE};
 
-pub struct UdpStream {
+// client does not perform connect
+// so that it can recv from any remote addr
+pub struct Client(SocketAddr);
+pub struct Server {}
+pub struct UdpStream<T> {
     io: UdpSocket,
     buffer: BytesMut,
+    role: T,
 }
 
-impl IOStream for UdpStream {}
+impl IOStream for UdpStream<Client> {}
+impl IOStream for UdpStream<Server> {}
 
-impl UdpStream {
+impl<T> UdpStream<T> {
     #[inline]
-    fn new(io: UdpSocket) -> Self {
+    fn new(io: UdpSocket, role: T) -> Self {
         UdpStream {
             io,
             buffer: BytesMut::with_capacity(UDP_BUF_SIZE),
+            role,
         }
     }
 }
 
-impl AsyncRead for UdpStream {
+impl AsyncRead for UdpStream<Server> {
     #[inline]
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -49,7 +56,24 @@ impl AsyncRead for UdpStream {
     }
 }
 
-impl AsyncWrite for UdpStream {
+impl AsyncRead for UdpStream<Client> {
+    #[inline]
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        if !self.buffer.is_empty() {
+            let to_read = min(buf.remaining(), self.buffer.len());
+            let data = self.buffer.split_to(to_read);
+            buf.put_slice(&data[..to_read]);
+            return Poll::Ready(Ok(()));
+        };
+        Poll::Ready(ready!(self.io.poll_recv_from(cx, buf)).map(|_| ()))
+    }
+}
+
+impl AsyncWrite for UdpStream<Server> {
     #[inline]
     fn poll_write(
         self: Pin<&mut Self>,
@@ -57,6 +81,33 @@ impl AsyncWrite for UdpStream {
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
         self.io.poll_send(cx, buf)
+    }
+
+    #[inline]
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        _: &mut Context<'_>,
+    ) -> Poll<Result<(), io::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    #[inline]
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        _: &mut Context<'_>,
+    ) -> Poll<Result<(), io::Error>> {
+        Poll::Ready(Ok(()))
+    }
+}
+
+impl AsyncWrite for UdpStream<Client> {
+    #[inline]
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, io::Error>> {
+        self.io.poll_send_to(cx, buf, self.role.0)
     }
 
     #[inline]
@@ -92,7 +143,7 @@ impl AsyncConnect for Connector {
 
     const SCHEME: &'static str = "udp";
 
-    type IO = UdpStream;
+    type IO = UdpStream<Client>;
 
     #[inline]
     fn addr(&self) -> &CommonAddr { &self.addr }
@@ -113,8 +164,7 @@ impl AsyncConnect for Connector {
             utils::empty_sockaddr_v6()
         };
         let socket = UdpSocket::bind(&bind_addr).await?;
-        socket.connect(&connect_addr).await?;
-        Ok(UdpStream::new(socket))
+        Ok(UdpStream::new(socket, Client(connect_addr)))
     }
 }
 
@@ -133,9 +183,9 @@ impl AsyncAccept for Acceptor {
 
     const SCHEME: &'static str = "udp";
 
-    type IO = UdpStream;
+    type IO = UdpStream<Server>;
 
-    type Base = UdpStream;
+    type Base = UdpStream<Server>;
 
     fn addr(&self) -> &CommonAddr { &self.addr }
 
@@ -153,7 +203,7 @@ impl AsyncAccept for Acceptor {
         let socket = new_udp_socket(bind_addr)?;
         let (_, connect_addr) = socket.recv_from(&mut buffer).await?;
         socket.connect(&connect_addr).await?;
-        Ok((UdpStream::new(socket), connect_addr))
+        Ok((UdpStream::new(socket, Server {}), connect_addr))
     }
 
     #[inline]
