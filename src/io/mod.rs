@@ -2,7 +2,6 @@ use std::io;
 use std::sync::Arc;
 use futures::try_join;
 
-use crate::transport::plain::PlainStream;
 use crate::transport::{AsyncConnect, AsyncAccept};
 
 mod copy;
@@ -45,9 +44,8 @@ pub mod linux_ext {
     use super::*;
     use zero_copy::zero_copy;
     use crate::transport::plain;
-
     pub async fn bidi_zero_copy(
-        mut sin: PlainStream,
+        mut sin: plain::PlainStream,
         conn: plain::Connector,
     ) -> io::Result<()> {
         let mut sout = conn.connect().await?;

@@ -3,7 +3,6 @@ use tokio::task::JoinHandle;
 
 use super::common;
 use super::transport;
-use crate::utils::CommonAddr;
 use crate::config::{EpHalfConfig, NetConfig};
 use crate::transport::plain::{self, PlainListener};
 use crate::transport::udp;
@@ -11,6 +10,8 @@ use crate::transport::udp;
 pub fn new_plain_conn(addr: &str, net: &NetConfig) -> plain::Connector {
     #[cfg(unix)]
     use std::path::PathBuf;
+    #[cfg(unix)]
+    use crate::utils::CommonAddr;
     match net {
         NetConfig::TCP => {
             let sockaddr = common::parse_socket_addr(addr, true).unwrap();
@@ -21,13 +22,15 @@ pub fn new_plain_conn(addr: &str, net: &NetConfig) -> plain::Connector {
             let path = CommonAddr::UnixSocketPath(PathBuf::from(addr));
             plain::Connector::new(path)
         }
-        NetConfig::UDP => unreachable!(),
+        _ => unreachable!(),
     }
 }
 
 pub fn new_plain_lis(addr: &str, net: &NetConfig) -> plain::Acceptor {
     #[cfg(unix)]
     use std::path::PathBuf;
+    #[cfg(unix)]
+    use crate::utils::CommonAddr;
     match net {
         NetConfig::TCP => {
             let sockaddr = common::parse_socket_addr(addr, false).unwrap();
@@ -40,7 +43,7 @@ pub fn new_plain_lis(addr: &str, net: &NetConfig) -> plain::Acceptor {
             let lis = PlainListener::bind(&path).unwrap();
             plain::Acceptor::new(lis, path)
         }
-        NetConfig::UDP => unreachable!(),
+        _ => unreachable!(),
     }
 }
 
@@ -56,7 +59,6 @@ pub fn new_udp_conn(addr: &str, net: &NetConfig) -> udp::Connector {
 }
 
 pub fn new_udp_lis(addr: &str, net: &NetConfig) -> udp::Acceptor {
-    #[cfg(unix)]
     match net {
         NetConfig::UDP => {
             let sockaddr = common::parse_socket_addr(addr, false).unwrap();

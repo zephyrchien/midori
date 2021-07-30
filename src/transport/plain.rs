@@ -290,6 +290,7 @@ impl Acceptor {
     pub fn new(lis: PlainListener, addr: CommonAddr) -> Self {
         Acceptor { lis, addr }
     }
+    #[cfg(target_os = "linux")]
     #[inline]
     pub fn inner(&self) -> &PlainListener { &self.lis }
 }

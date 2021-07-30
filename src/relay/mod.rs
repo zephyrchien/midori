@@ -3,7 +3,7 @@ use futures::future::join_all;
 
 use tokio::task::JoinHandle;
 
-use crate::config::{EndpointConfig, EpHalfConfig, NetConfig, TransportConfig};
+use crate::config::{EndpointConfig, EpHalfConfig};
 
 mod net;
 mod transport;
@@ -11,6 +11,7 @@ mod common;
 
 #[cfg(target_os = "linux")]
 pub fn meet_zero_copy(listen: &EpHalfConfig, remote: &EpHalfConfig) -> bool {
+    use crate::config::{NetConfig, TransportConfig};
     matches!(
         (&listen.net, &remote.net, &listen.trans, &remote.trans),
         (
