@@ -1,225 +1,48 @@
 use std::io;
-use std::net::SocketAddr;
-use std::sync::Arc;
 use futures::future::join_all;
 
 use tokio::task::JoinHandle;
 
-mod stream;
+use crate::config::{EndpointConfig, EpHalfConfig, NetConfig, TransportConfig};
 
-use crate::dns;
-use crate::utils::{self, CommonAddr};
-use crate::config::{
-    EndpointConfig, EpHalfConfig, HTTP2Config, NetConfig, TLSConfig,
-    TransportConfig, WebSocketConfig, WithTransport,
-};
-use crate::transport::{AsyncConnect, AsyncAccept};
-use crate::transport::plain::{self, PlainListener};
-
-fn parse_domain_name(s: &str) -> Option<(String, u16)> {
-    let mut iter = s.splitn(2, ':');
-    let addr = iter.next()?.to_string();
-    let port = iter.next()?.parse::<u16>().ok()?;
-    // check addr
-    if dns::resolve_sync(&addr).is_ok() {
-        Some((addr, port))
-    } else {
-        None
-    }
-}
-
-fn parse_socket_addr(
-    addr: &str,
-    allow_domain_name: bool,
-) -> io::Result<CommonAddr> {
-    if let Ok(sockaddr) = addr.parse::<SocketAddr>() {
-        return Ok(CommonAddr::SocketAddr(sockaddr));
-    };
-    if allow_domain_name {
-        if let Some((addr, port)) = parse_domain_name(addr) {
-            return Ok(CommonAddr::DomainName(addr, port));
-        }
-    };
-    Err(utils::new_io_err("unable to parse socket addr"))
-}
-
-fn new_plain_conn(addr: &str, net: &NetConfig) -> plain::Connector {
-    #[cfg(unix)]
-    use std::path::PathBuf;
-    match net {
-        NetConfig::TCP => {
-            let sockaddr = parse_socket_addr(addr, true).unwrap();
-            plain::Connector::new(sockaddr)
-        }
-        #[cfg(unix)]
-        NetConfig::UDS => {
-            let path = CommonAddr::UnixSocketPath(PathBuf::from(addr));
-            plain::Connector::new(path)
-        }
-        NetConfig::UDP => unreachable!(),
-    }
-}
-
-fn new_plain_lis(addr: &str, net: &NetConfig) -> plain::Acceptor {
-    #[cfg(unix)]
-    use std::path::PathBuf;
-    match net {
-        NetConfig::TCP => {
-            let sockaddr = parse_socket_addr(addr, false).unwrap();
-            let lis = PlainListener::bind(&sockaddr).unwrap();
-            plain::Acceptor::new(lis, sockaddr)
-        }
-        #[cfg(unix)]
-        NetConfig::UDS => {
-            let path = CommonAddr::UnixSocketPath(PathBuf::from(addr));
-            let lis = PlainListener::bind(&path).unwrap();
-            plain::Acceptor::new(lis, path)
-        }
-        NetConfig::UDP => unreachable!(),
-    }
-}
+mod net;
+mod transport;
+mod common;
 
 #[cfg(target_os = "linux")]
-fn meet_zero_copy(
-    lis_trans: &TransportConfig,
-    conn_trans: &TransportConfig,
-) -> bool {
+pub fn meet_zero_copy(listen: &EpHalfConfig, remote: &EpHalfConfig) -> bool {
     matches!(
-        (lis_trans, conn_trans),
-        (TransportConfig::Plain, TransportConfig::Plain)
+        (&listen.net, &remote.net, &listen.trans, &remote.trans),
+        (
+            NetConfig::TCP | NetConfig::UDS,
+            NetConfig::TCP | NetConfig::UDS,
+            TransportConfig::Plain,
+            TransportConfig::Plain
+        )
     )
-}
-
-fn spawn_lis_half_with_trans<L, C>(
-    workers: &mut Vec<JoinHandle<io::Result<()>>>,
-    lis_trans: &TransportConfig,
-    lis: L,
-    conn: C,
-) where
-    L: AsyncAccept + 'static,
-    C: AsyncConnect + 'static,
-{
-    match lis_trans {
-        TransportConfig::Plain => {
-            workers.push(tokio::spawn(stream::proxy(
-                Arc::new(lis),
-                Arc::new(conn),
-            )));
-        }
-        TransportConfig::WS(lisc) => {
-            let lis = <WebSocketConfig as WithTransport<L, C>>::apply_to_lis(
-                lisc, lis,
-            );
-            workers.push(tokio::spawn(stream::proxy(
-                Arc::new(lis),
-                Arc::new(conn),
-            )));
-        }
-        TransportConfig::H2(lisc) => {
-            let conn = Arc::new(conn);
-            let lis =
-                <HTTP2Config as WithTransport<L, C>>::apply_to_lis_with_conn(
-                    lisc,
-                    conn.clone(),
-                    lis,
-                );
-            workers.push(tokio::spawn(stream::proxy(Arc::new(lis), conn)));
-        }
-    }
-}
-
-fn spawn_conn_half_with_trans<L, C>(
-    workers: &mut Vec<JoinHandle<io::Result<()>>>,
-    lis_trans: &TransportConfig,
-    conn_trans: &TransportConfig,
-    lis: L,
-    conn: C,
-) where
-    L: AsyncAccept + 'static,
-    C: AsyncConnect + 'static,
-{
-    match conn_trans {
-        TransportConfig::Plain => {
-            spawn_lis_half_with_trans(workers, lis_trans, lis, conn);
-        }
-        TransportConfig::WS(connc) => {
-            let conn = <WebSocketConfig as WithTransport<L, C>>::apply_to_conn(
-                connc, conn,
-            );
-            spawn_lis_half_with_trans(workers, lis_trans, lis, conn);
-        }
-        TransportConfig::H2(connc) => {
-            let conn = <HTTP2Config as WithTransport<L, C>>::apply_to_conn(
-                connc, conn,
-            );
-            spawn_lis_half_with_trans(workers, lis_trans, lis, conn);
-        }
-    }
-}
-
-fn spawn_with_tls(
-    workers: &mut Vec<JoinHandle<io::Result<()>>>,
-    listen: &EpHalfConfig,
-    remote: &EpHalfConfig,
-    lis: plain::Acceptor,
-    conn: plain::Connector,
-) {
-    match &listen.tls {
-        TLSConfig::Server(lisc) => match &remote.tls {
-            TLSConfig::Client(connc) => spawn_conn_half_with_trans(
-                workers,
-                &listen.trans,
-                &remote.trans,
-                lisc.apply_to_lis(lis),
-                connc.apply_to_conn(conn),
-            ),
-            _ => spawn_conn_half_with_trans(
-                workers,
-                &listen.trans,
-                &remote.trans,
-                lisc.apply_to_lis(lis),
-                conn,
-            ),
-        },
-        _ => match &remote.tls {
-            TLSConfig::Client(connc) => spawn_conn_half_with_trans(
-                workers,
-                &listen.trans,
-                &remote.trans,
-                lis,
-                connc.apply_to_conn(conn),
-            ),
-
-            _ => spawn_conn_half_with_trans(
-                workers,
-                &listen.trans,
-                &remote.trans,
-                lis,
-                conn,
-            ),
-        },
-    }
 }
 
 pub async fn run(eps: Vec<EndpointConfig>) {
     let mut workers: Vec<JoinHandle<io::Result<()>>> =
         Vec::with_capacity(eps.len());
     for ep in eps.into_iter() {
-        // convert to full config
+        // convert into full config
         let EndpointConfig { listen, remote } = ep;
         let listen: EpHalfConfig = listen.into();
         let remote: EpHalfConfig = remote.into();
-        // init listener and connector
-        let plain_lis = new_plain_lis(&listen.addr, &listen.net);
-        let plain_conn = new_plain_conn(&remote.addr, &remote.net);
+
         // create zero-copy task
         #[cfg(target_os = "linux")]
-        if meet_zero_copy(&listen.trans, &remote.trans) {
-            workers.push(tokio::spawn(stream::splice(plain_lis, plain_conn)));
+        if meet_zero_copy(&listen, &remote) {
+            use crate::io::linux_ext::splice;
+            let lis = net::new_plain_lis(&listen.addr, &listen.net);
+            let conn = net::new_plain_conn(&remote.addr, &remote.net);
+            workers.push(tokio::spawn(splice(lis, conn)));
             continue;
         }
+
         // load transport config and create task
-        spawn_with_tls(&mut workers, &listen, &remote, plain_lis, plain_conn);
+        net::spawn_with_net(&mut workers, &listen, &remote);
     }
     join_all(workers).await;
 }

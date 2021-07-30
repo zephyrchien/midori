@@ -99,7 +99,7 @@ impl AsyncConnect for Connector {
 
     async fn connect(&self) -> io::Result<Self::IO> {
         let connect_addr = match &self.addr {
-            CommonAddr::SocketAddr(sockaddr) => sockaddr.clone(),
+            CommonAddr::SocketAddr(sockaddr) => *sockaddr,
             CommonAddr::DomainName(addr, port) => {
                 let ip = dns::resolve_async(addr).await?;
                 SocketAddr::new(ip, *port)
@@ -142,7 +142,7 @@ impl AsyncAccept for Acceptor {
     async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
         let mut buffer = BytesMut::with_capacity(UDP_BUF_SIZE);
         let bind_addr = match &self.addr {
-            CommonAddr::SocketAddr(sockaddr) => sockaddr.clone(),
+            CommonAddr::SocketAddr(sockaddr) => *sockaddr,
             CommonAddr::DomainName(addr, port) => {
                 let ip = dns::resolve_async(addr).await?;
                 SocketAddr::new(ip, *port)
