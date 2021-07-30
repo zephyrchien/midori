@@ -274,7 +274,7 @@ impl PlainListener {
             #[cfg(unix)]
             PlainListener::UDS(x) => {
                 let (stream, _) = x.accept().await?;
-                let sockaddr = utils::empty_sockaddr();
+                let sockaddr = utils::empty_sockaddr_v4();
                 (PlainStream::UDS(stream), sockaddr)
             }
         })

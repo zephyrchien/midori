@@ -8,6 +8,7 @@ pub mod plain;
 pub mod ws;
 pub mod h2;
 pub mod tls;
+pub mod udp;
 
 trait IOStream: AsyncRead + AsyncWrite + Send + Sync + Unpin {}
 
@@ -17,6 +18,7 @@ pub enum Transport {
     TLS,
     WS,
     H2,
+    UDP,
 }
 
 #[async_trait]
