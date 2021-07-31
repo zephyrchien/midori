@@ -3,7 +3,8 @@ use std::cmp::min;
 use std::pin::Pin;
 use std::task::{Poll, Context};
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use futures::ready;
 
 use bytes::{Bytes, BytesMut};
@@ -122,25 +123,14 @@ impl AsyncWrite for H2Stream {
     }
 }
 
-#[derive(Clone)]
-struct Channel {
-    count: usize,
-    client: SendRequest<Bytes>,
-}
-
-impl Channel {
-    fn new(client: SendRequest<Bytes>) -> Channel {
-        Channel { count: 1, client }
-    }
-}
-
 // HTTP2 Connector
 pub struct Connector<T: AsyncConnect> {
     cc: T,
     uri: Uri,
     allow_push: bool,
     max_concurrent: usize,
-    channel: Arc<Mutex<Option<Channel>>>,
+    count: AtomicUsize,
+    channel: RwLock<Option<SendRequest<Bytes>>>,
 }
 
 impl<T: AsyncConnect> Connector<T> {
@@ -166,7 +156,8 @@ impl<T: AsyncConnect> Connector<T> {
                 .unwrap(),
             allow_push,
             max_concurrent,
-            channel: Arc::new(Mutex::new(None)),
+            count: AtomicUsize::new(1),
+            channel: RwLock::new(None),
         }
     }
 }
@@ -247,14 +238,11 @@ async fn new_client<T: AsyncConnect>(
     cc: &Connector<T>,
 ) -> io::Result<SendRequest<Bytes>> {
     // reuse existed connection
-    let channel = (*cc.channel.lock().unwrap()).clone();
+    let channel = (*cc.channel.read().unwrap()).clone();
     if let Some(channel) = channel {
-        if channel.count < cc.max_concurrent {
-            if let Ok(client) = channel.client.ready().await {
-                match cc.channel.lock().unwrap().as_mut() {
-                    Some(x) => x.count += 1,
-                    None => unreachable!(),
-                };
+        if cc.count.load(Ordering::Relaxed) < cc.max_concurrent {
+            if let Ok(client) = channel.ready().await {
+                cc.count.fetch_add(1, Ordering::Relaxed);
                 return Ok(client);
             };
         };
@@ -270,7 +258,7 @@ async fn new_client<T: AsyncConnect>(
 
     // store connection
     // may have conflicts
-    *cc.channel.lock().unwrap() = Some(Channel::new(client.clone()));
+    *cc.channel.write().unwrap() = Some(client.clone());
     tokio::spawn(conn);
 
     client
