@@ -11,7 +11,6 @@ pub mod tls;
 pub mod udp;
 pub mod quic;
 
-
 trait IOStream: AsyncRead + AsyncWrite + Send + Sync + Unpin {}
 
 #[allow(clippy::upper_case_acronyms)]

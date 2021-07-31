@@ -8,7 +8,6 @@ pub const BUF_SIZE: usize = 0x4000;
 pub const WS_BUF_SIZE: usize = 0x1000;
 pub const H2_BUF_SIZE: usize = 0x1000;
 pub const UDP_BUF_SIZE: usize = 0x1000;
-pub const QUIC_BUF_SIZE: usize = 0x1000;
 pub const OCSP_BUF_SIZE: usize = 0x400;
 
 pub const NOT_A_DNS_NAME: &str = "localhost";
