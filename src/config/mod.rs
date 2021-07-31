@@ -1,7 +1,6 @@
 use std::fs;
 use std::sync::Arc;
 use serde::{Serialize, Deserialize};
-use crate::transport::plain;
 use crate::transport::{AsyncConnect, AsyncAccept};
 
 mod dns;
@@ -30,7 +29,7 @@ impl GlobalConfig {
     }
 }
 
-pub trait WithTransport<L = plain::Acceptor, C = plain::Connector>
+pub trait WithTransport<L, C>
 where
     L: AsyncAccept,
     C: AsyncConnect,

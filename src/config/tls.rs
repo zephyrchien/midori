@@ -6,7 +6,7 @@ use webpki::DNSNameRef;
 use rustls::{ClientConfig, ServerConfig, NoClientAuth};
 use rustls::internal::msgs::enums::ProtocolVersion;
 
-use crate::utils::{self, NATIVE_CERTS, NOT_A_DNS_NAME};
+use crate::utils::{self, CommonAddr, NATIVE_CERTS, NOT_A_DNS_NAME};
 use crate::transport::tls;
 use crate::transport::{AsyncConnect, AsyncAccept};
 
@@ -66,6 +66,33 @@ impl rustls::ServerCertVerifier for ClientSkipVerify {
     }
 }
 
+impl TLSClientConfig {
+    pub fn to_tls(self) -> ClientConfig { make_client_config(&self) }
+
+    pub fn set_sni(
+        &self,
+        tlsc: &mut ClientConfig,
+        addr: &CommonAddr,
+    ) -> String {
+        if !self.sni.is_empty() {
+            return self.sni.clone();
+        };
+        let sni = addr.to_dns_name();
+        if !sni.is_empty() {
+            return sni;
+        };
+        tlsc.enable_sni = false;
+        String::from(NOT_A_DNS_NAME)
+    }
+
+    pub fn apply_to_conn<C: AsyncConnect>(&self, conn: C) -> impl AsyncConnect {
+        let mut tlsc = make_client_config(self);
+        let sni = self.set_sni(&mut tlsc, conn.addr());
+        let sni = DNSNameRef::try_from_ascii_str(&sni).unwrap().to_owned();
+        tls::Connector::new(conn, sni, tlsc)
+    }
+}
+
 fn make_client_config(config: &TLSClientConfig) -> ClientConfig {
     let mut tlsc = ClientConfig::new();
     tlsc.enable_sni = config.enable_sni;
@@ -112,28 +139,6 @@ fn make_client_config(config: &TLSClientConfig) -> ClientConfig {
     tlsc
 }
 
-impl TLSClientConfig {
-    pub fn apply_to_conn<C: AsyncConnect>(&self, conn: C) -> impl AsyncConnect {
-        let mut config = make_client_config(self);
-        let sni = DNSNameRef::try_from_ascii_str(&{
-            if !self.sni.is_empty() {
-                self.sni.clone()
-            } else {
-                let s = conn.addr().to_dns_name();
-                if s.is_empty() {
-                    config.enable_sni = false;
-                    String::from(NOT_A_DNS_NAME)
-                } else {
-                    s
-                }
-            }
-        })
-        .unwrap()
-        .to_owned();
-        tls::Connector::new(conn, sni, config)
-    }
-}
-
 // TLS Server
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TLSServerConfig {
@@ -149,6 +154,15 @@ pub struct TLSServerConfig {
 
     #[serde(default)]
     pub ocsp: String,
+}
+
+impl TLSServerConfig {
+    pub fn to_tls(&self) -> ServerConfig { make_server_config(&self) }
+
+    pub fn apply_to_lis<L: AsyncAccept>(&self, lis: L) -> impl AsyncAccept {
+        let config = make_server_config(self);
+        tls::Acceptor::new(lis, config)
+    }
 }
 
 fn make_server_config(config: &TLSServerConfig) -> ServerConfig {
@@ -188,11 +202,4 @@ fn make_server_config(config: &TLSServerConfig) -> ServerConfig {
     tlsc.set_single_cert_with_ocsp_and_sct(certs, key, ocsp, Vec::new())
         .unwrap();
     tlsc
-}
-
-impl TLSServerConfig {
-    pub fn apply_to_lis<L: AsyncAccept>(&self, lis: L) -> impl AsyncAccept {
-        let config = make_server_config(self);
-        tls::Acceptor::new(lis, config)
-    }
 }
