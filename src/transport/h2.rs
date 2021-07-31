@@ -258,6 +258,7 @@ async fn new_client<T: AsyncConnect>(
 
     // store connection
     // may have conflicts
+    cc.count.store(1, Ordering::Relaxed);
     *cc.channel.write().unwrap() = Some(client.clone());
     tokio::spawn(conn);
 
@@ -415,22 +416,10 @@ async fn handle_mux_conn<C, IO>(
     C: AsyncConnect + 'static,
     IO: AsyncRead + AsyncWrite + Unpin,
 {
+    use crate::io::bidi_copy_with_stream;
     while let Some(Ok((request, response))) = conn.accept().await {
         if let Ok(stream) = handle_request(&path, request, response).await {
-            tokio::spawn(proxy(cc.clone(), stream));
+            tokio::spawn(bidi_copy_with_stream(cc.clone(), stream));
         }
     }
-}
-
-async fn proxy<C>(cc: Arc<C>, sin: H2Stream) -> io::Result<()>
-where
-    C: AsyncConnect + 'static,
-{
-    use futures::try_join;
-    use crate::io::copy;
-    let sout = cc.connect().await?;
-    let (ri, wi) = tokio::io::split(sin);
-    let (ro, wo) = tokio::io::split(sout);
-    let _ = try_join!(copy(ri, wo), copy(ro, wi));
-    Ok(())
 }

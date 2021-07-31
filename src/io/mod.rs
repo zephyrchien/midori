@@ -2,6 +2,7 @@ use std::io;
 use std::sync::Arc;
 use futures::try_join;
 
+use tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::{AsyncConnect, AsyncAccept};
 
 mod copy;
@@ -17,6 +18,19 @@ where
     C: AsyncConnect,
 {
     let (sin, sout) = try_join!(lis.accept(base), conn.connect())?;
+    let (ri, wi) = tokio::io::split(sin);
+    let (ro, wo) = tokio::io::split(sout);
+    let _ = try_join!(copy(ri, wo), copy(ro, wi));
+    Ok(())
+}
+
+// this is only used by protocols that impl multiplex
+pub async fn bidi_copy_with_stream<C, S>(cc: Arc<C>, sin: S) -> io::Result<()>
+where
+    C: AsyncConnect + 'static,
+    S: AsyncRead + AsyncWrite,
+{
+    let sout = cc.connect().await?;
     let (ri, wi) = tokio::io::split(sin);
     let (ro, wo) = tokio::io::split(sout);
     let _ = try_join!(copy(ri, wo), copy(ro, wi));
