@@ -13,6 +13,7 @@ pub enum TransportConfig {
     Plain,
     WS(WebSocketConfig),
     H2(HTTP2Config),
+    QUIC(QuicConfig),
 }
 
 impl Default for TransportConfig {
@@ -30,6 +31,12 @@ pub struct HTTP2Config {
 
     #[serde(default)]
     pub server_push: bool,
+    #[serde(default)]
+    pub mux: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct QuicConfig {
     #[serde(default)]
     pub mux: usize,
 }

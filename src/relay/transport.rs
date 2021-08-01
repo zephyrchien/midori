@@ -20,7 +20,8 @@ fn spawn_lis_half_with_trans<L, C>(
     C: AsyncConnect + 'static,
 {
     match lis_trans {
-        TransportConfig::Plain => {
+        // quic does not need extra configuration
+        TransportConfig::Plain | TransportConfig::QUIC(_) => {
             workers.push(tokio::spawn(proxy(Arc::new(lis), Arc::new(conn))));
         }
         TransportConfig::WS(lisc) => {
@@ -53,7 +54,8 @@ fn spawn_conn_half_with_trans<L, C>(
     C: AsyncConnect + 'static,
 {
     match conn_trans {
-        TransportConfig::Plain => {
+        // quic does not need extra configuration
+        TransportConfig::Plain | TransportConfig::QUIC(_) => {
             spawn_lis_half_with_trans(workers, lis_trans, lis, conn);
         }
         TransportConfig::WS(connc) => {

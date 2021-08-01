@@ -89,16 +89,11 @@ impl Connector {
         sni: String,
         max_concurrent: usize,
     ) -> Self {
-        // default:
-        // set ciphersuits = QUIC_CIPHER_SUITES
-        // set versions = TLSv1_3
-        // set enable_early_data = true
-        //tlsc.ciphersuites = config.crypto.ciphersuites.clone();
-        //tlsc.versions = config.crypto.versions.clone();
-        //tlsc.enable_early_data = config.crypto.enable_early_data;
-
-        //config.crypto = Arc::new(tlsc);
-
+        let max_concurrent = if max_concurrent == 0 {
+            1000
+        } else {
+            max_concurrent
+        };
         Connector {
             cc,
             addr,
@@ -181,12 +176,8 @@ pub struct Acceptor<C: AsyncConnect> {
 }
 
 impl<C: AsyncConnect> Acceptor<C> {
-    pub fn new(cc: C, lis: Incoming, addr: CommonAddr) -> Self {
-        Acceptor {
-            cc: Arc::new(cc),
-            lis,
-            addr,
-        }
+    pub fn new(cc: Arc<C>, lis: Incoming, addr: CommonAddr) -> Self {
+        Acceptor { cc, lis, addr }
     }
 }
 

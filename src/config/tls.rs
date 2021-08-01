@@ -67,7 +67,7 @@ impl rustls::ServerCertVerifier for ClientSkipVerify {
 }
 
 impl TLSClientConfig {
-    pub fn to_tls(self) -> ClientConfig { make_client_config(&self) }
+    pub fn to_tls(&self) -> ClientConfig { make_client_config(self) }
 
     pub fn set_sni(
         &self,
