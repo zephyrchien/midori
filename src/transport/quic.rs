@@ -89,8 +89,8 @@ impl Connector {
         sni: String,
         max_concurrent: usize,
     ) -> Self {
-        let max_concurrent = if max_concurrent == 0 {
-            1000
+        let max_concurrent = if max_concurrent == 0 || max_concurrent > 100 {
+            100
         } else {
             max_concurrent
         };
@@ -128,6 +128,7 @@ async fn new_client(cc: &Connector) -> io::Result<Connection<TlsSession>> {
     let channel = (*cc.channel.read().unwrap()).clone();
     if let Some(client) = channel {
         if cc.count.load(Ordering::Relaxed) < cc.max_concurrent {
+            cc.count.fetch_add(1, Ordering::Relaxed);
             return Ok(client);
         };
     };
