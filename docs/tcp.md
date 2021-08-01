@@ -6,7 +6,7 @@ On linux, zero-copy is enabled.
 
 ## position
 
-global->endpoints->endpoint->listen|remote->net
+endpoint->listen|remote->net->tcp
 
 ## example
 use default value: net = tcp, transport = plain, tls = none

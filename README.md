@@ -25,7 +25,7 @@
 - [x] [HTTP2][h2-doc-url]
 - [ ] KCP
 - [ ] gRPC
-- [ ] QUIC
+- [x] [QUIC][quic-doc-url]
 
 [doc-url]: https://github.com/zephyrchien/midori/tree/master/docs
 
@@ -40,6 +40,8 @@
 [ws-doc-url]: https://github.com/zephyrchien/midori/blob/master/docs/ws.md
 
 [h2-doc-url]: https://github.com/zephyrchien/midori/blob/master/docs/h2.md
+
+[quic-doc-url]: https://github.com/zephyrchien/midori/blob/master/docs/quic.md
 
 ## Usage
 ```shell
@@ -56,9 +58,9 @@ OPTIONS:
 ## Quick Start
 Get started with a simple TCP relay(supports zero-copy on linux).
 
-First, create a config file. Just specify the listen and remote address.
+You need to create a config file and then specify the listen and remote address.
+
 ```json
-// config.json
 {
     "endpoints":[
         {
@@ -73,14 +75,12 @@ First, create a config file. Just specify the listen and remote address.
 }
 ```
 
-Then launch these 2 endpoints:
+Launch these 2 endpoints:
 ```shell
 midori -c config.json
 ```
 
 Note: Almost all kinds of address are supported, including `ipv4`, `ipv6`, `domain name` and `unix socket path`.
-
-<br>
 
 ## Full Configuration
 <details>
@@ -148,7 +148,6 @@ The `trust-dns` crate supports these strategies:
 ### Endpoint(s)
 Each endpoint contains an associated pair of `listen` and `remote`.
 ```bash
-// endpoint
 {
     "listen": "",
     "remote": ""
@@ -159,7 +158,6 @@ Below is the options of `listen` or `remote`. **Each field has a default value e
 
 Moreover, `trans` and `tls` also support more complicated params(e.g. `path`, `sni`, `ocsp`..). [See Protocol Docs for more details][doc-url].
 ```bash
-// listen or remote
 {
     "addr": "",  // must
     "net": "",  // tcp(deafult), uds, udp

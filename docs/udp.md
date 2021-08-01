@@ -9,7 +9,7 @@ The server binds a given port with `SO_REUSEADDR` socket opt. When a packet from
 The client side simply uses the specified address as sending destination, it does not limit where the packet comes from. It is `Full Cone`.
 
 ## position
-global->endpoints->endpoint->listen|remote->net
+endpoint->listen|remote->net->udp
 
 ## example
 ```json

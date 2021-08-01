@@ -5,7 +5,7 @@ It is only for Unix. Although Windows 10 has supported UDS recently, and there h
 On linux, zero-copy is enabled.
 
 ## position
-global->endpoints->endpoint->listen|remote->net
+endpoint->listen|remote->net->uds
 
 ## example
 use default value: transport = plain, tls = none

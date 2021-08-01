@@ -3,7 +3,7 @@
 WebSocket is established on top of an underlying connection, which could be TCP, UDS, or TLS.
 
 ## position
-global->endpoints->endpoint->listen|remote->trans->ws
+endpoint->listen|remote->trans->ws
 
 ## options
 
@@ -12,7 +12,11 @@ no default value
 
 ## example
 
-ws over tcp
+Also See: [TLS][tls-doc-url]
+
+[tls-doc-url]: https://github.com/zephyrchien/midori/blob/master/docs/tls.md
+
+> ws over tcp
 ```shell
 "remote": {
     "addr": "127.0.0.1:5000",
@@ -34,7 +38,7 @@ ws over tcp
 }
 ```
 
-ws over uds
+> ws over uds
 ```shell
 "remote": {
     "addr": "127.0.0.1:5000",
@@ -46,7 +50,7 @@ ws over uds
 }
 ```
 
-ws over tls
+> ws over tls
 ```shell
 "remote": {
     "addr": "127.0.0.1:5000",

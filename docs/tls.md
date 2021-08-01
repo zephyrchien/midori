@@ -3,7 +3,7 @@
 TLS could be used everywhere.
 
 ## position
-global->endpoints->endpoint->listen|remote->tls
+endpoint->listen|remote->tls
 
 ## options
 
