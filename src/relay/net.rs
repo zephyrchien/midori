@@ -4,11 +4,11 @@ use tokio::task::JoinHandle;
 use super::common;
 use super::transport;
 use crate::config::{EpHalfConfig, NetConfig, TransportConfig, TLSConfig};
-use crate::transport::AsyncConnect;
 use crate::transport::plain::{self, PlainListener};
 use crate::transport::udp;
 use crate::transport::quic;
 
+// ===== TCP or UDS =====
 pub fn new_plain_conn(addr: &str, net: &NetConfig) -> plain::Connector {
     #[cfg(unix)]
     use std::path::PathBuf;
@@ -153,17 +153,32 @@ pub fn spawn_with_net(
     listen: &EpHalfConfig,
     remote: &EpHalfConfig,
 ) {
+    use NetConfig::*;
+    use TransportConfig::QUIC;
+    use utils::MaybeQuic;
     match listen.net {
-        NetConfig::TCP | NetConfig::UDS => {
-            let lis = new_plain_lis(&listen.addr, &listen.net);
+        TCP | UDS => {
+            let lis =
+                MaybeQuic::Other(new_plain_lis(&listen.addr, &listen.net));
             match remote.net {
-                NetConfig::TCP | NetConfig::UDS => {
+                TCP | UDS => {
                     let conn = new_plain_conn(&remote.addr, &remote.net);
                     transport::spawn_with_trans(
                         workers, listen, remote, lis, conn,
                     )
                 }
-                NetConfig::UDP => {
+                UDP if matches!(remote.trans, QUIC(_)) => {
+                    let conn = new_quic_conn(
+                        &remote.addr,
+                        &remote.net,
+                        &remote.trans,
+                        &remote.tls,
+                    );
+                    transport::spawn_with_trans(
+                        workers, listen, remote, lis, conn,
+                    )
+                }
+                UDP => {
                     let conn = new_udp_conn(&remote.addr, &remote.net);
                     transport::spawn_with_trans(
                         workers, listen, remote, lis, conn,
@@ -171,16 +186,60 @@ pub fn spawn_with_net(
                 }
             }
         }
-        NetConfig::UDP => {
-            let lis = new_udp_lis(&listen.addr, &listen.net);
+        UDP if matches!(listen.trans, QUIC(_)) => {
+            let lis = MaybeQuic::<quic::RawAcceptor>::Quic(new_quic_raw_lis(
+                &listen.addr,
+                &listen.net,
+                &listen.trans,
+                &listen.tls,
+            ));
             match remote.net {
-                NetConfig::TCP | NetConfig::UDS => {
+                TCP | UDS => {
                     let conn = new_plain_conn(&remote.addr, &remote.net);
                     transport::spawn_with_trans(
                         workers, listen, remote, lis, conn,
                     )
                 }
-                NetConfig::UDP => {
+                UDP if matches!(listen.trans, QUIC(_)) => {
+                    let conn = new_quic_conn(
+                        &remote.addr,
+                        &remote.net,
+                        &remote.trans,
+                        &remote.tls,
+                    );
+                    transport::spawn_with_trans(
+                        workers, listen, remote, lis, conn,
+                    )
+                }
+                UDP => {
+                    let conn = new_udp_conn(&remote.addr, &remote.net);
+                    transport::spawn_with_trans(
+                        workers, listen, remote, lis, conn,
+                    )
+                }
+            }
+        }
+        UDP => {
+            let lis = MaybeQuic::Other(new_udp_lis(&listen.addr, &listen.net));
+            match remote.net {
+                TCP | UDS => {
+                    let conn = new_plain_conn(&remote.addr, &remote.net);
+                    transport::spawn_with_trans(
+                        workers, listen, remote, lis, conn,
+                    )
+                }
+                UDP if matches!(listen.trans, QUIC(_)) => {
+                    let conn = new_quic_conn(
+                        &remote.addr,
+                        &remote.net,
+                        &remote.trans,
+                        &remote.tls,
+                    );
+                    transport::spawn_with_trans(
+                        workers, listen, remote, lis, conn,
+                    )
+                }
+                UDP => {
                     let conn = new_udp_conn(&remote.addr, &remote.net);
                     transport::spawn_with_trans(
                         workers, listen, remote, lis, conn,

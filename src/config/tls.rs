@@ -156,12 +156,24 @@ pub struct TLSServerConfig {
     pub ocsp: String,
 }
 
+use crate::utils::MaybeQuic;
+
 impl TLSServerConfig {
-    pub fn to_tls(&self) -> ServerConfig { make_server_config(&self) }
+    pub fn to_tls(&self) -> ServerConfig { make_server_config(self) }
 
     pub fn apply_to_lis<L: AsyncAccept>(&self, lis: L) -> impl AsyncAccept {
         let config = make_server_config(self);
         tls::Acceptor::new(lis, config)
+    }
+
+    pub fn apply_to_lis_ext<L: AsyncAccept>(
+        &self,
+        lis: MaybeQuic<L>,
+    ) -> MaybeQuic<impl AsyncAccept> {
+        match lis {
+            MaybeQuic::Quic(x) => MaybeQuic::Quic(x),
+            MaybeQuic::Other(x) => MaybeQuic::Other(self.apply_to_lis(x)),
+        }
     }
 }
 

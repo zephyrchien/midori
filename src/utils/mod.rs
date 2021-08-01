@@ -5,7 +5,7 @@ mod types;
 mod consts;
 mod cert;
 pub use consts::*;
-pub use types::CommonAddr;
+pub use types::{CommonAddr, MaybeQuic};
 pub use cert::{load_certs, load_keys, generate_cert_key};
 #[cfg(target_os = "linux")]
 pub use consts::PIPE_BUF_SIZE;

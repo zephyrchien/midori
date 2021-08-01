@@ -31,3 +31,24 @@ impl CommonAddr {
         }
     }
 }
+
+use crate::transport::quic;
+pub enum MaybeQuic<L> {
+    Quic(quic::RawAcceptor),
+    Other(L),
+}
+
+impl<L> MaybeQuic<L> {
+    pub fn take_quic(self) -> Option<quic::RawAcceptor> {
+        match self {
+            Self::Quic(x) => Some(x),
+            _ => None,
+        }
+    }
+    pub fn take_other(self) -> Option<L> {
+        match self {
+            Self::Other(x) => Some(x),
+            _ => None,
+        }
+    }
+}

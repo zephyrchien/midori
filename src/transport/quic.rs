@@ -200,7 +200,7 @@ impl AsyncAccept for Acceptor<()> {
         let connecting = lis
             .next()
             .await
-            .ok_or(utils::new_io_err("no more connections"))?;
+            .ok_or_else(|| utils::new_io_err("no more connections"))?;
 
         // early data
         let new_conn = match connecting.into_0rtt() {
@@ -217,7 +217,7 @@ impl AsyncAccept for Acceptor<()> {
         let (send, recv) = bi_streams
             .next()
             .await
-            .ok_or(utils::new_io_err("connection closed"))??;
+            .ok_or_else(|| utils::new_io_err("connection closed"))??;
 
         Ok((QuicStream::new(send, recv), x.remote_address()))
     }
@@ -249,7 +249,7 @@ where
         let connecting = lis
             .next()
             .await
-            .ok_or(utils::new_io_err("no more connections"))?;
+            .ok_or_else(|| utils::new_io_err("no more connections"))?;
 
         // early data
         let new_conn = match connecting.into_0rtt() {
@@ -266,7 +266,7 @@ where
         let (send, recv) = bi_streams
             .next()
             .await
-            .ok_or(utils::new_io_err("connection closed"))??;
+            .ok_or_else(|| utils::new_io_err("connection closed"))??;
 
         tokio::spawn(handle_mux_conn(self.cc.clone(), bi_streams));
         Ok((QuicStream::new(send, recv), x.remote_address()))
@@ -323,7 +323,7 @@ impl AsyncAccept for RawAcceptor {
         let connecting = lis
             .next()
             .await
-            .ok_or(utils::new_io_err("no more connections"))?;
+            .ok_or_else(|| utils::new_io_err("no more connections"))?;
 
         // early data
         let new_conn = match connecting.into_0rtt() {
@@ -340,7 +340,7 @@ impl AsyncAccept for RawAcceptor {
         let (send, recv) = bi_streams
             .next()
             .await
-            .ok_or(utils::new_io_err("connection closed"))??;
+            .ok_or_else(|| utils::new_io_err("connection closed"))??;
 
         Ok((QuicStream::new(send, recv), x.remote_address()))
     }
