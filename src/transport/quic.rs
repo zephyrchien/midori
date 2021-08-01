@@ -169,18 +169,65 @@ async fn new_client(cc: &Connector) -> io::Result<Connection<TlsSession>> {
 }
 
 // Acceptor
-pub struct Acceptor<C: AsyncConnect> {
+pub struct Acceptor<C> {
     cc: Arc<C>,
     lis: Incoming,
     addr: CommonAddr,
 }
 
-impl<C: AsyncConnect> Acceptor<C> {
+impl<C> Acceptor<C> {
     pub fn new(cc: Arc<C>, lis: Incoming, addr: CommonAddr) -> Self {
         Acceptor { cc, lis, addr }
     }
 }
 
+// Single Connection
+#[async_trait]
+impl AsyncAccept for Acceptor<()> {
+    const TRANS: Transport = Transport::QUIC;
+
+    const SCHEME: &'static str = "quic";
+
+    type IO = QuicStream;
+
+    type Base = QuicStream;
+
+    fn addr(&self) -> &CommonAddr { &self.addr }
+
+    async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
+        // new connection
+        let lis = unsafe { utils::const_cast(&self.lis) };
+        let connecting = lis
+            .next()
+            .await
+            .ok_or(utils::new_io_err("no more connections"))?;
+
+        // early data
+        let new_conn = match connecting.into_0rtt() {
+            Ok((new_conn, _)) => new_conn,
+            Err(connecting) => connecting.await?,
+        };
+
+        let NewConnection {
+            connection: x,
+            mut bi_streams,
+            ..
+        } = new_conn;
+
+        let (send, recv) = bi_streams
+            .next()
+            .await
+            .ok_or(utils::new_io_err("connection closed"))??;
+
+        Ok((QuicStream::new(send, recv), x.remote_address()))
+    }
+
+    async fn accept(&self, base: Self::Base) -> io::Result<Self::IO> {
+        Ok(base)
+    }
+}
+
+// Mux
 #[async_trait]
 impl<C> AsyncAccept for Acceptor<C>
 where
@@ -240,5 +287,65 @@ where
             cc.clone(),
             QuicStream::new(send, recv),
         ));
+    }
+}
+
+// Acceptor
+pub struct RawAcceptor {
+    lis: Incoming,
+    addr: CommonAddr,
+}
+
+impl RawAcceptor {
+    pub fn new(lis: Incoming, addr: CommonAddr) -> Self {
+        RawAcceptor { lis, addr }
+    }
+    pub fn set_connector<C>(self, cc: Arc<C>) -> Acceptor<C> {
+        Acceptor::new(cc, self.lis, self.addr)
+    }
+}
+
+#[async_trait]
+impl AsyncAccept for RawAcceptor {
+    const TRANS: Transport = Transport::QUIC;
+
+    const SCHEME: &'static str = "quic";
+
+    type IO = QuicStream;
+
+    type Base = QuicStream;
+
+    fn addr(&self) -> &CommonAddr { &self.addr }
+
+    async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
+        // new connection
+        let lis = unsafe { utils::const_cast(&self.lis) };
+        let connecting = lis
+            .next()
+            .await
+            .ok_or(utils::new_io_err("no more connections"))?;
+
+        // early data
+        let new_conn = match connecting.into_0rtt() {
+            Ok((new_conn, _)) => new_conn,
+            Err(connecting) => connecting.await?,
+        };
+
+        let NewConnection {
+            connection: x,
+            mut bi_streams,
+            ..
+        } = new_conn;
+
+        let (send, recv) = bi_streams
+            .next()
+            .await
+            .ok_or(utils::new_io_err("connection closed"))??;
+
+        Ok((QuicStream::new(send, recv), x.remote_address()))
+    }
+
+    async fn accept(&self, base: Self::Base) -> io::Result<Self::IO> {
+        Ok(base)
     }
 }

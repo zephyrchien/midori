@@ -269,7 +269,7 @@ async fn new_client<T: AsyncConnect>(
 }
 
 // HTTP2 Acceptor
-pub struct Acceptor<L: AsyncAccept, C: AsyncConnect> {
+pub struct Acceptor<L: AsyncAccept, C> {
     cc: Arc<C>,
     lis: L,
     path: String,
@@ -280,7 +280,6 @@ pub struct Acceptor<L: AsyncAccept, C: AsyncConnect> {
 impl<L, C> Acceptor<L, C>
 where
     L: AsyncAccept,
-    C: AsyncConnect,
 {
     pub fn new(cc: Arc<C>, lis: L, path: String, server_push: bool) -> Self {
         Acceptor {
@@ -292,6 +291,54 @@ where
     }
 }
 
+// Single Connection
+#[async_trait]
+impl<L> AsyncAccept for Acceptor<L, ()>
+where
+    L: AsyncAccept,
+{
+    const TRANS: Transport = Transport::H2;
+
+    const SCHEME: &'static str = match L::TRANS {
+        Transport::TLS => "https",
+        _ => "http",
+    };
+
+    type IO = H2Stream;
+
+    type Base = L::Base;
+
+    #[inline]
+    fn addr(&self) -> &CommonAddr { self.lis.addr() }
+
+    #[inline]
+    async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
+        self.lis.accept_base().await
+    }
+
+    #[inline]
+    async fn accept(&self, base: Self::Base) -> io::Result<Self::IO> {
+        let stream = self.lis.accept(base).await?;
+        // establish a new connection
+        let mut conn = server::handshake(stream)
+            .await
+            .map_err(|e| utils::new_io_err(&e.to_string()))?;
+
+        // accept a new stream
+        let (request, response) = conn
+            .accept()
+            .await
+            .unwrap()
+            .map_err(|e| utils::new_io_err(&e.to_string()))?;
+
+        // handle the initial request
+        let h2_stream = handle_request(&self.path, request, response).await?;
+
+        Ok(h2_stream)
+    }
+}
+
+// Mux
 #[async_trait]
 impl<L, C> AsyncAccept for Acceptor<L, C>
 where

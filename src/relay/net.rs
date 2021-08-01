@@ -108,20 +108,14 @@ pub fn new_quic_conn(
     quic::Connector::new(ep, sockaddr, sni, trans.mux)
 }
 
-pub fn new_quic_lis<C: AsyncConnect>(
-    cc: Arc<C>,
+pub fn new_quic_raw_lis(
     addr: &str,
-    net: &NetConfig,
+    _: &NetConfig,
     trans: &TransportConfig,
     tlsc: &TLSConfig,
-) -> quic::Acceptor<C> {
-    // check net
-    match net {
-        NetConfig::UDP => {}
-        _ => unreachable!(),
-    }
+) -> quic::RawAcceptor {
     // check transport
-    let trans = match trans {
+    match trans {
         TransportConfig::QUIC(x) => x,
         _ => unreachable!(),
     };
@@ -151,7 +145,7 @@ pub fn new_quic_lis<C: AsyncConnect>(
     let mut builder = Endpoint::builder();
     builder.listen(server_config);
     let (_, incoming) = builder.bind(bind_addr).expect("failed to bind");
-    quic::Acceptor::new(cc, incoming, sockaddr)
+    quic::RawAcceptor::new(incoming, sockaddr)
 }
 
 pub fn spawn_with_net(
