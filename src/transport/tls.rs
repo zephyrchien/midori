@@ -1,4 +1,4 @@
-use std::io;
+use std::io::Result;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -42,7 +42,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
 
     #[inline]
-    async fn connect(&self) -> io::Result<Self::IO> {
+    async fn connect(&self) -> Result<Self::IO> {
         let stream = self.cc.connect().await?;
         self.tls.connect(self.sni.as_ref(), stream).await
     }
@@ -77,12 +77,12 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
     fn addr(&self) -> &utils::CommonAddr { self.lis.addr() }
 
     #[inline]
-    async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
+    async fn accept_base(&self) -> Result<(Self::Base, SocketAddr)> {
         self.lis.accept_base().await
     }
 
     #[inline]
-    async fn accept(&self, base: Self::Base) -> io::Result<Self::IO> {
+    async fn accept(&self, base: Self::Base) -> Result<Self::IO> {
         let stream = self.lis.accept(base).await?;
         Ok(self.tls.accept(stream).await?)
     }

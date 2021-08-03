@@ -1,8 +1,8 @@
-use std::io;
 use std::cmp::min;
 use std::pin::Pin;
 use std::task::{Poll, Context};
 use std::net::SocketAddr;
+use std::io::{Result, Error, ErrorKind};
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use futures::ready;
@@ -13,11 +13,10 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use h2::{SendStream, RecvStream};
 use h2::client::{self, SendRequest};
 use h2::server::{self, SendResponse};
-
 use async_trait::async_trait;
 
 use super::{AsyncConnect, AsyncAccept, IOStream, Transport};
-use crate::utils::{self, CommonAddr, H2_BUF_SIZE};
+use crate::utils::{CommonAddr, H2_BUF_SIZE};
 
 pub struct H2Stream {
     recv: RecvStream,
@@ -43,7 +42,7 @@ impl AsyncRead for H2Stream {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
+    ) -> Poll<Result<()>> {
         if !self.buffer.is_empty() {
             let to_read = min(buf.remaining(), self.buffer.len());
             let data = self.buffer.split_to(to_read);
@@ -62,7 +61,10 @@ impl AsyncRead for H2Stream {
                 self.recv
                     .flow_control()
                     .release_capacity(to_read)
-                    .map_err(|e| utils::new_io_err(&e.to_string()))
+                    .map_or_else(
+                        |e| Err(Error::new(ErrorKind::ConnectionReset, e)),
+                        |_| Ok(()),
+                    )
             }
             // no more data frames
             // maybe trailer
@@ -78,22 +80,20 @@ impl AsyncWrite for H2Stream {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-    ) -> Poll<Result<usize, io::Error>> {
+    ) -> Poll<Result<usize>> {
         self.send.reserve_capacity(buf.len());
         Poll::Ready(match ready!(self.send.poll_capacity(cx)) {
-            Some(to_write) => {
-                let to_write = to_write.unwrap();
-                self.send
-                    .send_data(Bytes::from(buf[..to_write].to_owned()), false)
-                    .map_or_else(
-                        |e| Err(utils::new_io_err(&e.to_string())),
-                        |_| Ok(to_write),
-                    )
-            }
+            Some(Ok(to_write)) => self
+                .send
+                .send_data(Bytes::from(buf[..to_write].to_owned()), false)
+                .map_or_else(
+                    |e| Err(Error::new(ErrorKind::BrokenPipe, e)),
+                    |_| Ok(to_write),
+                ),
             // is_send_streaming returns false
             // which indicates the state is
             // neither open nor half_close_remote
-            None => Err(utils::new_io_err("broken pipe")),
+            _ => Err(Error::new(ErrorKind::BrokenPipe, "broken pipe")),
         })
     }
 
@@ -101,7 +101,7 @@ impl AsyncWrite for H2Stream {
     fn poll_flush(
         self: Pin<&mut Self>,
         _: &mut Context<'_>,
-    ) -> Poll<Result<(), io::Error>> {
+    ) -> Poll<Result<()>> {
         Poll::Ready(Ok(()))
     }
 
@@ -109,13 +109,13 @@ impl AsyncWrite for H2Stream {
     fn poll_shutdown(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Result<(), io::Error>> {
+    ) -> Poll<Result<()>> {
         self.send.reserve_capacity(0);
         Poll::Ready(ready!(self.send.poll_capacity(cx)).map_or(
-            Err(utils::new_io_err("broken pipe")),
+            Err(Error::new(ErrorKind::BrokenPipe, "broken pipe")),
             |_| {
                 self.send.send_data(Bytes::new(), true).map_or_else(
-                    |e| Err(utils::new_io_err(&e.to_string())),
+                    |e| Err(Error::new(ErrorKind::BrokenPipe, e)),
                     |_| Ok(()),
                 )
             },
@@ -177,7 +177,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
 
     #[inline]
-    async fn connect(&self) -> io::Result<Self::IO> {
+    async fn connect(&self) -> Result<Self::IO> {
         let mut client = new_client(self).await?;
 
         // request with a send stream
@@ -190,7 +190,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
                     .unwrap(),
                 false,
             )
-            .map_err(|e| utils::new_io_err(&e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::Interrupted, e))?;
 
         /*
         // prepare to recv server push
@@ -201,7 +201,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
         // get recv stream from response body
         let recv = response
             .await
-            .map_err(|e| utils::new_io_err(&e.to_string()))?
+            .map_err(|e| Error::new(ErrorKind::Interrupted, e))?
             .into_body();
 
         /*
@@ -236,7 +236,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
 
 async fn new_client<T: AsyncConnect>(
     cc: &Connector<T>,
-) -> io::Result<SendRequest<Bytes>> {
+) -> Result<SendRequest<Bytes>> {
     // reuse existed connection
     let channel = (*cc.channel.read().unwrap()).clone();
     if let Some(channel) = channel {
@@ -254,7 +254,7 @@ async fn new_client<T: AsyncConnect>(
         .enable_push(cc.allow_push)
         .handshake(stream)
         .await
-        .map_err(|e| utils::new_io_err(&e.to_string()))?;
+        .map_err(|e| Error::new(ErrorKind::ConnectionRefused, e))?;
 
     // store connection
     // may have conflicts
@@ -265,7 +265,7 @@ async fn new_client<T: AsyncConnect>(
     client
         .ready()
         .await
-        .map_err(|e| utils::new_io_err(&e.to_string()))
+        .map_err(|e| Error::new(ErrorKind::Interrupted, e))
 }
 
 // HTTP2 Acceptor
@@ -312,24 +312,24 @@ where
     fn addr(&self) -> &CommonAddr { self.lis.addr() }
 
     #[inline]
-    async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
+    async fn accept_base(&self) -> Result<(Self::Base, SocketAddr)> {
         self.lis.accept_base().await
     }
 
     #[inline]
-    async fn accept(&self, base: Self::Base) -> io::Result<Self::IO> {
+    async fn accept(&self, base: Self::Base) -> Result<Self::IO> {
         let stream = self.lis.accept(base).await?;
         // establish a new connection
         let mut conn = server::handshake(stream)
             .await
-            .map_err(|e| utils::new_io_err(&e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::ConnectionAborted, e))?;
 
         // accept a new stream
         let (request, response) = conn
             .accept()
             .await
             .unwrap()
-            .map_err(|e| utils::new_io_err(&e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::Interrupted, e))?;
 
         // handle the initial request
         let h2_stream = handle_request(&self.path, request, response).await?;
@@ -360,24 +360,24 @@ where
     fn addr(&self) -> &CommonAddr { self.lis.addr() }
 
     #[inline]
-    async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
+    async fn accept_base(&self) -> Result<(Self::Base, SocketAddr)> {
         self.lis.accept_base().await
     }
 
     #[inline]
-    async fn accept(&self, base: Self::Base) -> io::Result<Self::IO> {
+    async fn accept(&self, base: Self::Base) -> Result<Self::IO> {
         let stream = self.lis.accept(base).await?;
         // establish a new connection
         let mut conn = server::handshake(stream)
             .await
-            .map_err(|e| utils::new_io_err(&e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::ConnectionAborted, e))?;
 
         // accept a new stream
         let (request, response) = conn
             .accept()
             .await
             .unwrap()
-            .map_err(|e| utils::new_io_err(&e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::Interrupted, e))?;
 
         // handle the initial request
         let h2_stream = handle_request(&self.path, request, response).await?;
@@ -393,7 +393,7 @@ async fn handle_request(
     path: &str,
     request: Request<RecvStream>,
     mut response: SendResponse<Bytes>,
-) -> io::Result<H2Stream> {
+) -> Result<H2Stream> {
     // check request path
     if request.uri().path() != path {
         let _ = response.send_response(
@@ -403,7 +403,7 @@ async fn handle_request(
                 .unwrap(),
             true,
         );
-        return Err(utils::new_io_err("invalid path"));
+        return Err(Error::new(ErrorKind::NotFound, "invalid path"));
     }
 
     // get recv stream from request body
@@ -428,7 +428,7 @@ async fn handle_request(
             Response::builder().status(StatusCode::OK).body(()).unwrap(),
             false,
         )
-        .map_err(|e| utils::new_io_err(&e.to_string()))?;
+        .map_err(|e| Error::new(ErrorKind::Interrupted, e))?;
 
     /*
     // try server push

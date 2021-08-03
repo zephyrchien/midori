@@ -1,7 +1,7 @@
-use std::io;
 use std::cmp::min;
 use std::pin::Pin;
 use std::task::{Poll, Context};
+use std::io::{Error, ErrorKind, Result};
 use std::net::SocketAddr;
 use futures::ready;
 use futures::sink::Sink;
@@ -10,7 +10,7 @@ use futures::stream::Stream;
 use bytes::BytesMut;
 use http::{Uri, StatusCode};
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_tungstenite::WebSocketStream;
+use tokio_tungstenite::WebSocketStream as RawWebSocketStream;
 use tokio_tungstenite::tungstenite;
 use tungstenite::Message;
 use tungstenite::protocol::WebSocketConfig;
@@ -18,18 +18,18 @@ use tungstenite::handshake::server::{Callback, Request, Response, ErrorResponse}
 use async_trait::async_trait;
 
 use super::{AsyncConnect, AsyncAccept, IOStream, Transport};
-use crate::utils::{self, CommonAddr, WS_BUF_SIZE};
+use crate::utils::{CommonAddr, WS_BUF_SIZE};
 
-pub struct WSStream<S> {
-    io: WebSocketStream<S>,
+pub struct WebSocketStream<S> {
+    io: RawWebSocketStream<S>,
     buffer: BytesMut,
 }
 
-impl<S: IOStream> IOStream for WSStream<S> {}
+impl<S: IOStream> IOStream for WebSocketStream<S> {}
 
-impl<S> WSStream<S> {
-    pub fn new(io: WebSocketStream<S>) -> Self {
-        WSStream {
+impl<S> WebSocketStream<S> {
+    pub fn new(io: RawWebSocketStream<S>) -> Self {
+        WebSocketStream {
             io,
             buffer: BytesMut::with_capacity(WS_BUF_SIZE),
         }
@@ -39,7 +39,7 @@ impl<S> WSStream<S> {
 // impl AsyncRead, AsyncWrite
 // borrowed from
 // https://github.com/eycorsican/leaf/blob/master/leaf/src/proxy/ws/stream.rs
-impl<S> AsyncRead for WSStream<S>
+impl<S> AsyncRead for WebSocketStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
@@ -48,7 +48,7 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
+    ) -> Poll<Result<()>> {
         if !self.buffer.is_empty() {
             let to_read = min(buf.remaining(), self.buffer.len());
             let data = self.buffer.split_to(to_read);
@@ -57,10 +57,11 @@ where
             return Poll::Ready(Ok(()));
         };
         Poll::Ready(ready!(Pin::new(&mut self.io).poll_next(cx)).map_or(
-            Err(utils::new_io_err("broken pipe")),
+            Err(Error::new(ErrorKind::ConnectionReset, "connection reset")),
             |item| {
-                item.map_or(Err(utils::new_io_err("broken pipe")), |msg| {
-                    match msg {
+                item.map_or_else(
+                    |e| Err(Error::new(ErrorKind::Interrupted, e)),
+                    |msg| match msg {
                         Message::Binary(data) => {
                             let to_read = min(buf.remaining(), data.len());
                             buf.put_slice(&data[..to_read]);
@@ -70,15 +71,18 @@ where
                             Ok(())
                         }
                         Message::Close(_) => Ok(()),
-                        _ => Err(utils::new_io_err("invalid frame")),
-                    }
-                })
+                        _ => Err(Error::new(
+                            ErrorKind::InvalidData,
+                            "invalid frame",
+                        )),
+                    },
+                )
             },
         ))
     }
 }
 
-impl<S> AsyncWrite for WSStream<S>
+impl<S> AsyncWrite for WebSocketStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
@@ -87,15 +91,15 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut Context,
         buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    ) -> Poll<Result<usize>> {
         ready!(Pin::new(&mut self.io)
             .poll_ready(cx)
-            .map_err(|_| utils::new_io_err("broken_pipe")))?;
+            .map_err(|e| Error::new(ErrorKind::BrokenPipe, e)))?;
 
         let msg = Message::Binary(buf.to_vec());
         Pin::new(&mut self.io)
             .start_send(msg)
-            .map_err(|_| utils::new_io_err("broken_pipe"))?;
+            .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))?;
 
         Poll::Ready(Ok(buf.len()))
     }
@@ -104,25 +108,27 @@ where
     fn poll_flush(
         mut self: Pin<&mut Self>,
         cx: &mut Context,
-    ) -> Poll<io::Result<()>> {
+    ) -> Poll<Result<()>> {
         Pin::new(&mut self.io)
             .poll_flush(cx)
-            .map_err(|_| utils::new_io_err("broken_pipe"))
+            .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))
     }
 
     #[inline]
     fn poll_shutdown(
         mut self: Pin<&mut Self>,
         cx: &mut Context,
-    ) -> Poll<io::Result<()>> {
+    ) -> Poll<Result<()>> {
         // send a close frame
         ready!(Pin::new(&mut self.io)
             .poll_ready(cx)
-            .map_err(|e| utils::new_io_err(&e.to_string())))?;
-        let _ = Pin::new(&mut self.io).start_send(Message::Close(None));
+            .map_err(|e| Error::new(ErrorKind::BrokenPipe, e)))?;
+        let _ = Pin::new(&mut self.io)
+            .start_send(Message::Close(None))
+            .map_err(|e| Error::new(ErrorKind::BrokenPipe, e));
         Pin::new(&mut self.io)
             .poll_close(cx)
-            .map_err(|e| utils::new_io_err(&e.to_string()))
+            .map_err(|e| Error::new(ErrorKind::ConnectionAborted, e))
     }
 }
 
@@ -158,13 +164,13 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
         _ => "ws",
     };
 
-    type IO = WSStream<T::IO>;
+    type IO = WebSocketStream<T::IO>;
 
     #[inline]
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
 
     #[inline]
-    async fn connect(&self) -> io::Result<Self::IO> {
+    async fn connect(&self) -> Result<Self::IO> {
         let stream = self.cc.connect().await?;
         tokio_tungstenite::client_async_with_config(
             &self.uri,
@@ -173,11 +179,8 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
         )
         .await
         .map_or_else(
-            |e| {
-                println!("{}", e);
-                Err(utils::new_io_err(&e.to_string()))
-            },
-            |(ws, _)| Ok(WSStream::new(ws)),
+            |e| Err(Error::new(ErrorKind::ConnectionRefused, e)),
+            |(ws, _)| Ok(WebSocketStream::new(ws)),
         )
     }
 }
@@ -209,7 +212,7 @@ impl Callback for RequestHook {
         self,
         request: &Request,
         response: Response,
-    ) -> Result<Response, ErrorResponse> {
+    ) -> std::result::Result<Response, ErrorResponse> {
         if request.uri().path() == self.path {
             Ok(response)
         } else {
@@ -229,7 +232,7 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
         _ => "ws",
     };
 
-    type IO = WSStream<T::IO>;
+    type IO = WebSocketStream<T::IO>;
 
     type Base = T::Base;
 
@@ -237,12 +240,12 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
     fn addr(&self) -> &CommonAddr { self.lis.addr() }
 
     #[inline]
-    async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
+    async fn accept_base(&self) -> Result<(Self::Base, SocketAddr)> {
         self.lis.accept_base().await
     }
 
     #[inline]
-    async fn accept(&self, base: Self::Base) -> io::Result<Self::IO> {
+    async fn accept(&self, base: Self::Base) -> Result<Self::IO> {
         let stream = self.lis.accept(base).await?;
         let hook = RequestHook {
             path: self.path.clone(),
@@ -254,8 +257,8 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
         )
         .await
         .map_or_else(
-            |e| Err(utils::new_io_err(&e.to_string())),
-            |ws| Ok(WSStream::new(ws)),
+            |e| Err(Error::new(ErrorKind::ConnectionAborted, e)),
+            |ws| Ok(WebSocketStream::new(ws)),
         )
     }
 }

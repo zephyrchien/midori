@@ -79,7 +79,7 @@ impl AsyncWrite for UdpStream<Server> {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-    ) -> Poll<Result<usize, io::Error>> {
+    ) -> Poll<io::Result<usize>> {
         self.io.poll_send(cx, buf)
     }
 
@@ -87,7 +87,7 @@ impl AsyncWrite for UdpStream<Server> {
     fn poll_flush(
         self: Pin<&mut Self>,
         _: &mut Context<'_>,
-    ) -> Poll<Result<(), io::Error>> {
+    ) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
 
@@ -95,7 +95,7 @@ impl AsyncWrite for UdpStream<Server> {
     fn poll_shutdown(
         self: Pin<&mut Self>,
         _: &mut Context<'_>,
-    ) -> Poll<Result<(), io::Error>> {
+    ) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
 }
@@ -106,7 +106,7 @@ impl AsyncWrite for UdpStream<Client> {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-    ) -> Poll<Result<usize, io::Error>> {
+    ) -> Poll<io::Result<usize>> {
         self.io.poll_send_to(cx, buf, self.role.0)
     }
 
@@ -114,7 +114,7 @@ impl AsyncWrite for UdpStream<Client> {
     fn poll_flush(
         self: Pin<&mut Self>,
         _: &mut Context<'_>,
-    ) -> Poll<Result<(), io::Error>> {
+    ) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
 
@@ -122,7 +122,7 @@ impl AsyncWrite for UdpStream<Client> {
     fn poll_shutdown(
         self: Pin<&mut Self>,
         _: &mut Context<'_>,
-    ) -> Poll<Result<(), io::Error>> {
+    ) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
 }

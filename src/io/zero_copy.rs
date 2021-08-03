@@ -1,10 +1,10 @@
-use std::io;
 use std::ops::Drop;
 use std::os::unix::io::AsRawFd;
+use std::io::{Result, Error, ErrorKind};
 
 use tokio::io::{Interest, AsyncWriteExt};
 
-use crate::utils::{self, PIPE_BUF_SIZE};
+use crate::utils::PIPE_BUF_SIZE;
 use crate::transport::plain::{ReadHalf, WriteHalf, linux_ext};
 
 pub struct Pipe(i32, i32);
@@ -19,12 +19,15 @@ impl Drop for Pipe {
 }
 
 impl Pipe {
-    pub fn create() -> io::Result<Self> {
+    pub fn create() -> Result<Self> {
         use libc::{c_int, O_NONBLOCK};
         let mut pipes = std::mem::MaybeUninit::<[c_int; 2]>::uninit();
         unsafe {
             if libc::pipe2(pipes.as_mut_ptr() as *mut c_int, O_NONBLOCK) < 0 {
-                return Err(utils::new_io_err("failed to create a pipe"));
+                return Err(Error::new(
+                    ErrorKind::Unsupported,
+                    "failed to create pipe",
+                ));
             }
             Ok(Pipe(pipes.assume_init()[0], pipes.assume_init()[1]))
         }
@@ -54,17 +57,14 @@ fn is_wouldblock() -> bool {
 }
 
 // tokio >= 1.9.0
-pub async fn zero_copy(
-    r: ReadHalf<'_>,
-    mut w: WriteHalf<'_>,
-) -> io::Result<()> {
+pub async fn zero_copy(r: ReadHalf<'_>, mut w: WriteHalf<'_>) -> Result<()> {
     // init pipe
     let pipe = Pipe::create()?;
     let (rpipe, wpipe) = (pipe.0, pipe.1);
-    // r/w ref
+    // rw ref
     let rx = r.as_ref();
     let wx = w.as_ref();
-    // r/w raw fd
+    // rw raw fd
     let rfd = rx.as_raw_fd();
     let wfd = wx.as_raw_fd();
     // ctrl
@@ -106,8 +106,12 @@ pub async fn zero_copy(
         }
     }
 
-    w.shutdown().await?;
-    Ok(())
+    if done {
+        w.shutdown().await?;
+        Ok(())
+    } else {
+        Err(Error::new(ErrorKind::ConnectionReset, "connection reset"))
+    }
 }
 
 // before tokio 1.9.0

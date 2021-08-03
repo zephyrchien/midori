@@ -2,6 +2,7 @@ mod io;
 mod cmd;
 mod dns;
 mod relay;
+mod error;
 mod utils;
 mod config;
 mod transport;

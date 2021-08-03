@@ -1,8 +1,8 @@
-use std::io;
 use std::net::SocketAddr;
 
 use crate::dns;
-use crate::utils::{self, CommonAddr};
+use crate::error::addr::{Result, AddrError};
+use crate::utils::CommonAddr;
 
 #[allow(dead_code)]
 pub fn parse_domain_name(s: &str) -> Option<((String, u16), bool)> {
@@ -20,7 +20,7 @@ pub fn parse_domain_name(s: &str) -> Option<((String, u16), bool)> {
 pub fn parse_socket_addr(
     addr: &str,
     allow_domain_name: bool,
-) -> io::Result<(CommonAddr, bool)> {
+) -> Result<(CommonAddr, bool)> {
     if let Ok(sockaddr) = addr.parse::<SocketAddr>() {
         return Ok((CommonAddr::SocketAddr(sockaddr), sockaddr.is_ipv6()));
     };
@@ -29,5 +29,5 @@ pub fn parse_socket_addr(
             return Ok((CommonAddr::DomainName(addr, port), is_ipv6));
         }
     };
-    Err(utils::new_io_err("unable to parse socket addr"))
+    Err(AddrError::Invalid)
 }

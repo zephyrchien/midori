@@ -1,17 +1,16 @@
 use std::fs::File;
-use std::io::{self, BufReader};
+use std::io::BufReader;
 
 use rustls::{Certificate, PrivateKey};
 use rustls::internal::pemfile;
 
-use super::new_io_err;
+use crate::error::cert::{CertError, Result};
 
 pub fn generate_cert_key(
     common_name: &str,
-) -> io::Result<(Vec<Certificate>, PrivateKey)> {
+) -> Result<(Vec<Certificate>, PrivateKey)> {
     let certificate =
-        rcgen::generate_simple_self_signed(vec![common_name.to_string()])
-            .map_err(|_| new_io_err("unable to generate certificate"))?;
+        rcgen::generate_simple_self_signed(vec![common_name.to_string()])?;
     let cert = certificate.serialize_der().unwrap();
     let key = certificate.serialize_private_key_der();
     // der
@@ -20,12 +19,12 @@ pub fn generate_cert_key(
     Ok((vec![cert], key))
 }
 
-pub fn load_certs(path: &str) -> io::Result<Vec<Certificate>> {
+pub fn load_certs(path: &str) -> Result<Vec<Certificate>> {
     pemfile::certs(&mut BufReader::new(File::open(path)?))
-        .map_err(|_| new_io_err("invalid cert"))
+        .map_err(|_| CertError::LoadCertificate)
 }
 
-pub fn load_keys(path: &str) -> io::Result<Vec<PrivateKey>> {
+pub fn load_keys(path: &str) -> Result<Vec<PrivateKey>> {
     if let Ok(key) =
         pemfile::pkcs8_private_keys(&mut BufReader::new(File::open(path)?))
     {
@@ -40,7 +39,7 @@ pub fn load_keys(path: &str) -> io::Result<Vec<PrivateKey>> {
             return Ok(key);
         }
     }
-    Err(new_io_err("invalid key"))
+    Err(CertError::LoadPrivateKey)
 }
 
 /*
