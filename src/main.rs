@@ -7,10 +7,20 @@ mod utils;
 mod config;
 mod transport;
 
+use std::panic;
 use cmd::CmdInput;
 use config::GlobalConfig;
 
 fn main() {
+    // set global panic hook
+    panic::set_hook(Box::new(|panic_info| {
+        if let Some(x) = panic_info.payload().downcast_ref::<String>() {
+            println!("{}", x);
+        } else {
+            println!("{:?}", panic_info);
+        }
+    }));
+
     match cmd::scan() {
         CmdInput::Config(c) => start_from_config(c),
         CmdInput::Navigate => cmd::run_navigator(),

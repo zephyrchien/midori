@@ -6,7 +6,7 @@ use webpki::DNSNameRef;
 use rustls::{ClientConfig, ServerConfig, NoClientAuth};
 use rustls::internal::msgs::enums::ProtocolVersion;
 
-use crate::utils::{self, CommonAddr, NATIVE_CERTS, NOT_A_DNS_NAME};
+use crate::utils::{self, must, CommonAddr, NATIVE_CERTS, NOT_A_DNS_NAME};
 use crate::transport::tls;
 use crate::transport::{AsyncConnect, AsyncAccept};
 
@@ -130,9 +130,11 @@ fn make_client_config(config: &TLSClientConfig) -> ClientConfig {
 
         file_path => {
             tlsc.root_store
-                .add_pem_file(&mut BufReader::new(
-                    fs::File::open(file_path).expect("invalid cert file"),
-                ))
+                .add_pem_file(&mut BufReader::new(must!(
+                    fs::File::open(file_path),
+                    "open {}",
+                    file_path
+                )))
                 .unwrap();
         }
     };
@@ -197,21 +199,24 @@ fn make_server_config(config: &TLSServerConfig) -> ServerConfig {
             .collect();
     };
     let (certs, key) = if config.cert == config.key {
-        utils::generate_cert_key(&config.cert).unwrap()
+        must!(utils::generate_cert_key(&config.cert))
     } else {
-        let certs = utils::load_certs(&config.cert).unwrap();
-        let mut keys = utils::load_keys(&config.key).unwrap();
+        let certs =
+            must!(utils::load_certs(&config.cert), "load {}", &config.cert);
+        let mut keys =
+            must!(utils::load_keys(&config.key), "load {}", &config.key);
         (certs, keys.remove(0))
     };
     let mut ocsp = vec![0u8];
     if !config.ocsp.is_empty() {
         ocsp.reserve(utils::OCSP_BUF_SIZE);
-        let mut r = BufReader::new(
-            fs::File::open(&config.ocsp).expect("invalid ocsp file"),
-        );
-        r.read_to_end(&mut ocsp).unwrap();
+        let mut r = BufReader::new(must!(
+            fs::File::open(&config.ocsp),
+            "open {}",
+            &config.ocsp
+        ));
+        must!(r.read_to_end(&mut ocsp), "load {}", &config.ocsp);
     }
-    tlsc.set_single_cert_with_ocsp_and_sct(certs, key, ocsp, Vec::new())
-        .unwrap();
+    must!(tlsc.set_single_cert_with_ocsp_and_sct(certs, key, ocsp, Vec::new()));
     tlsc
 }

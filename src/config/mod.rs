@@ -1,6 +1,8 @@
 use std::fs;
 use std::sync::Arc;
 use serde::{Serialize, Deserialize};
+
+use crate::utils::must;
 use crate::transport::{AsyncConnect, AsyncAccept};
 
 mod dns;
@@ -24,8 +26,8 @@ pub struct GlobalConfig {
 
 impl GlobalConfig {
     pub fn from_config_file(file: &str) -> Self {
-        let config = fs::read_to_string(file).expect("invalid file path");
-        serde_json::from_str(&config).expect("failed to parse config file")
+        let config = must!(fs::read_to_string(file), "load {}", file);
+        must!(serde_json::from_str(&config), "parse json")
     }
 }
 

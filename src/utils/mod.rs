@@ -1,11 +1,16 @@
 use std::net::{SocketAddr, IpAddr, Ipv4Addr, Ipv6Addr};
 
-mod types;
-mod consts;
-mod cert;
+pub mod types;
+pub mod consts;
+pub mod cert;
+#[macro_use]
+pub mod macros;
+
 pub use consts::*;
 pub use types::{CommonAddr, MaybeQuic};
 pub use cert::{load_certs, load_keys, generate_cert_key};
+pub use must;
+
 #[cfg(target_os = "linux")]
 pub use consts::PIPE_BUF_SIZE;
 

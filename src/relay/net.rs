@@ -3,6 +3,7 @@ use tokio::task::JoinHandle;
 
 use super::common;
 use super::transport;
+use crate::utils::must;
 use crate::config::{EpHalfConfig, NetConfig, TransportConfig, TLSConfig};
 use crate::transport::plain::{self, PlainListener};
 use crate::transport::udp;
@@ -16,7 +17,7 @@ pub fn new_plain_conn(addr: &str, net: &NetConfig) -> plain::Connector {
     use crate::utils::CommonAddr;
     match net {
         NetConfig::TCP => {
-            let (sockaddr, _) = common::parse_socket_addr(addr, true).unwrap();
+            let (sockaddr, _) = must!(common::parse_socket_addr(addr, true));
             plain::Connector::new(sockaddr)
         }
         #[cfg(unix)]
@@ -35,14 +36,15 @@ pub fn new_plain_lis(addr: &str, net: &NetConfig) -> plain::Acceptor {
     use crate::utils::CommonAddr;
     match net {
         NetConfig::TCP => {
-            let (sockaddr, _) = common::parse_socket_addr(addr, false).unwrap();
-            let lis = PlainListener::bind(&sockaddr).unwrap();
+            let (sockaddr, _) = must!(common::parse_socket_addr(addr, false));
+            let lis =
+                must!(PlainListener::bind(&sockaddr), "bind {}", &sockaddr);
             plain::Acceptor::new(lis, sockaddr)
         }
         #[cfg(unix)]
         NetConfig::UDS => {
             let path = CommonAddr::UnixSocketPath(PathBuf::from(addr));
-            let lis = PlainListener::bind(&path).unwrap();
+            let lis = must!(PlainListener::bind(&path), "bind {}", &path);
             plain::Acceptor::new(lis, path)
         }
         _ => unreachable!(),
@@ -51,12 +53,12 @@ pub fn new_plain_lis(addr: &str, net: &NetConfig) -> plain::Acceptor {
 
 // ===== UDP =====
 pub fn new_udp_conn(addr: &str, _: &NetConfig) -> udp::Connector {
-    let (sockaddr, _) = common::parse_socket_addr(addr, true).unwrap();
+    let (sockaddr, _) = must!(common::parse_socket_addr(addr, true));
     udp::Connector::new(sockaddr)
 }
 
 pub fn new_udp_lis(addr: &str, _: &NetConfig) -> udp::Acceptor {
-    let (sockaddr, _) = common::parse_socket_addr(addr, false).unwrap();
+    let (sockaddr, _) = must!(common::parse_socket_addr(addr, false));
     udp::Acceptor::new(sockaddr)
 }
 
@@ -82,7 +84,7 @@ pub fn new_quic_conn(
         _ => unreachable!(),
     };
 
-    let (sockaddr, is_ipv6) = common::parse_socket_addr(addr, true).unwrap();
+    let (sockaddr, is_ipv6) = must!(common::parse_socket_addr(addr, true));
     let mut client_tls = tlsc.to_tls();
     let sni = tlsc.set_sni(&mut client_tls, &sockaddr);
 
@@ -104,7 +106,7 @@ pub fn new_quic_conn(
 
     let mut builder = Endpoint::builder();
     builder.default_client_config(client_config);
-    let (ep, _) = builder.bind(&bind_addr).unwrap();
+    let (ep, _) = must!(builder.bind(&bind_addr), "bind {}", &bind_addr);
     quic::Connector::new(ep, sockaddr, sni, trans.mux)
 }
 
@@ -125,7 +127,7 @@ pub fn new_quic_raw_lis(
         _ => unreachable!(),
     };
 
-    let (sockaddr, _) = common::parse_socket_addr(addr, false).unwrap();
+    let (sockaddr, _) = must!(common::parse_socket_addr(addr, false));
     let bind_addr = match sockaddr {
         utils::CommonAddr::SocketAddr(ref x) => x,
         _ => unreachable!(),

@@ -4,7 +4,6 @@ use crate::dns;
 use crate::error::addr::{Result, AddrError};
 use crate::utils::CommonAddr;
 
-#[allow(dead_code)]
 pub fn parse_domain_name(s: &str) -> Option<((String, u16), bool)> {
     let mut iter = s.splitn(2, ':');
     let addr = iter.next()?.to_string();
@@ -16,7 +15,6 @@ pub fn parse_domain_name(s: &str) -> Option<((String, u16), bool)> {
     None
 }
 
-#[allow(dead_code)]
 pub fn parse_socket_addr(
     addr: &str,
     allow_domain_name: bool,
@@ -29,5 +27,5 @@ pub fn parse_socket_addr(
             return Ok((CommonAddr::DomainName(addr, port), is_ipv6));
         }
     };
-    Err(AddrError::Invalid)
+    Err(AddrError::Invalid(addr.to_string()))
 }

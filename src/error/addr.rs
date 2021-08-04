@@ -5,7 +5,7 @@ pub type Result<T> = std::result::Result<T, AddrError>;
 
 #[derive(Debug)]
 pub enum AddrError {
-    Invalid,
+    Invalid(String),
     IO(std::io::Error),
 }
 
@@ -13,7 +13,7 @@ impl Display for AddrError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use AddrError::*;
         match self {
-            Invalid => write!(f, "invalid address"),
+            Invalid(s) => write!(f, "invalid address: {}", s),
             IO(..) => write!(f, "failed to open file"),
         }
     }
@@ -23,7 +23,7 @@ impl Error for AddrError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         use AddrError::*;
         match self {
-            Invalid => None,
+            Invalid(_) => None,
             IO(e) => Some(e),
         }
     }

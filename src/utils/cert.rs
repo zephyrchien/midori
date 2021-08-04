@@ -11,7 +11,7 @@ pub fn generate_cert_key(
 ) -> Result<(Vec<Certificate>, PrivateKey)> {
     let certificate =
         rcgen::generate_simple_self_signed(vec![common_name.to_string()])?;
-    let cert = certificate.serialize_der().unwrap();
+    let cert = certificate.serialize_der()?;
     let key = certificate.serialize_private_key_der();
     // der
     let cert = Certificate(cert);
