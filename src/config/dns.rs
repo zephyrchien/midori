@@ -20,14 +20,14 @@ impl Default for DnsMode {
     fn default() -> Self { Self::Ipv4ThenIpv6 }
 }
 
-impl DnsMode {
-    pub fn into_strategy(self) -> LookupIpStrategy {
-        match self {
-            Self::Ipv4Only => LookupIpStrategy::Ipv4Only,
-            Self::Ipv6Only => LookupIpStrategy::Ipv6Only,
-            Self::Ipv4AndIpv6 => LookupIpStrategy::Ipv4AndIpv6,
-            Self::Ipv4ThenIpv6 => LookupIpStrategy::Ipv4thenIpv6,
-            Self::Ipv6ThenIpv4 => LookupIpStrategy::Ipv6thenIpv4,
+impl From<DnsMode> for LookupIpStrategy {
+    fn from(mode: DnsMode) -> Self {
+        match mode {
+            DnsMode::Ipv4Only => LookupIpStrategy::Ipv4Only,
+            DnsMode::Ipv6Only => LookupIpStrategy::Ipv6Only,
+            DnsMode::Ipv4AndIpv6 => LookupIpStrategy::Ipv4AndIpv6,
+            DnsMode::Ipv4ThenIpv6 => LookupIpStrategy::Ipv4thenIpv6,
+            DnsMode::Ipv6ThenIpv4 => LookupIpStrategy::Ipv6thenIpv4,
         }
     }
 }
