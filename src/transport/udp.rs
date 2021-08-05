@@ -215,7 +215,6 @@ impl AsyncAccept for Acceptor {
     }
 }
 
-#[inline]
 fn new_udp_socket(sockaddr: SocketAddr) -> io::Result<UdpSocket> {
     let socket = Socket::new(
         if sockaddr.is_ipv4() {

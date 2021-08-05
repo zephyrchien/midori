@@ -212,7 +212,6 @@ pub struct Connector {
 impl Connector {
     pub fn new(addr: CommonAddr) -> Self { Connector { addr } }
 
-    #[inline]
     pub async fn connect_plain(&self) -> io::Result<PlainStream> {
         let stream = match &self.addr {
             CommonAddr::DomainName(addr, port) => {
@@ -247,6 +246,7 @@ impl AsyncConnect for Connector {
     #[inline]
     fn addr(&self) -> &CommonAddr { &self.addr }
 
+    #[inline]
     async fn connect(&self) -> io::Result<Self::IO> {
         self.connect_plain().await
     }
@@ -323,6 +323,7 @@ impl AsyncAccept for Acceptor {
         self.lis.accept_plain().await
     }
 
+    #[inline]
     async fn accept(&self, base: Self::Base) -> io::Result<Self::IO> {
         // fake accept
         Ok(base)

@@ -26,6 +26,7 @@ pub struct H2Stream {
 }
 
 impl H2Stream {
+    #[inline]
     pub fn new(
         recv: RecvStream,
         send: SendStream<Bytes>,
@@ -177,7 +178,6 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     #[inline]
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
 
-    #[inline]
     async fn connect(&self) -> Result<Self::IO> {
         let mut client = new_client(self).await?;
 
@@ -321,7 +321,6 @@ where
         self.lis.accept_base().await
     }
 
-    #[inline]
     async fn accept(&self, base: Self::Base) -> Result<Self::IO> {
         let stream = self.lis.accept(base).await?;
         debug!("h2 accept[new] <-");
@@ -370,7 +369,6 @@ where
         self.lis.accept_base().await
     }
 
-    #[inline]
     async fn accept(&self, base: Self::Base) -> Result<Self::IO> {
         let stream = self.lis.accept(base).await?;
         debug!("h2 accept[new] <-");

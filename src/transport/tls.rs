@@ -42,7 +42,6 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     #[inline]
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
 
-    #[inline]
     async fn connect(&self) -> Result<Self::IO> {
         let stream = self.cc.connect().await?;
         debug!("tls connect ->");
@@ -83,7 +82,6 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
         self.lis.accept_base().await
     }
 
-    #[inline]
     async fn accept(&self, base: Self::Base) -> Result<Self::IO> {
         let stream = self.lis.accept(base).await?;
         debug!("tls accept <-");
