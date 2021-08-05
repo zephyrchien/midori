@@ -12,6 +12,7 @@ use cmd::CmdInput;
 use config::GlobalConfig;
 
 fn main() {
+    env_logger::init();
     // set global panic hook
     panic::set_hook(Box::new(|panic_info| {
         if let Some(x) = panic_info.payload().downcast_ref::<String>() {

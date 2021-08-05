@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::{BufReader, Read};
+use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 use webpki::DNSNameRef;
@@ -20,6 +21,17 @@ pub enum TLSConfig {
 
 impl Default for TLSConfig {
     fn default() -> Self { Self::None }
+}
+
+impl Display for TLSConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use TLSConfig::*;
+        match self {
+            None => write!(f, "none"),
+            Client(_) => write!(f, "rustls"),
+            Server(_) => write!(f, "rustls"),
+        }
+    }
 }
 
 // create default values

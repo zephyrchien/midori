@@ -1,4 +1,5 @@
 use std::io;
+use log::{info, debug};
 use tokio::task::JoinHandle;
 
 use super::common;
@@ -39,12 +40,14 @@ pub fn new_plain_lis(addr: &str, net: &NetConfig) -> plain::Acceptor {
             let (sockaddr, _) = must!(common::parse_socket_addr(addr, false));
             let lis =
                 must!(PlainListener::bind(&sockaddr), "bind {}", &sockaddr);
+            info!("bind {}[tcp]", &sockaddr);
             plain::Acceptor::new(lis, sockaddr)
         }
         #[cfg(unix)]
         NetConfig::UDS => {
             let path = CommonAddr::UnixSocketPath(PathBuf::from(addr));
             let lis = must!(PlainListener::bind(&path), "bind {}", &path);
+            info!("bind {}[uds]", &path);
             plain::Acceptor::new(lis, path)
         }
         _ => unreachable!(),
@@ -147,6 +150,7 @@ pub fn new_quic_raw_lis(
     let mut builder = Endpoint::builder();
     builder.listen(server_config);
     let (_, incoming) = builder.bind(bind_addr).expect("failed to bind");
+    info!("bind {}[quic]", &bind_addr);
     quic::RawAcceptor::new(incoming, sockaddr)
 }
 
@@ -158,6 +162,10 @@ pub fn spawn_with_net(
     use NetConfig::*;
     use TransportConfig::QUIC;
     use utils::MaybeQuic;
+
+    debug!("load listen network[{}]", &listen.net);
+    debug!("load remote network[{}]", &remote.net);
+
     match listen.net {
         TCP | UDS => {
             let lis =

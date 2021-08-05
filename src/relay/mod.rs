@@ -1,6 +1,7 @@
 use std::io;
 use futures::future::join_all;
 
+use log::{warn, info, debug};
 use tokio::task::JoinHandle;
 
 use crate::config::{EndpointConfig, EpHalfConfig};
@@ -24,9 +25,11 @@ pub fn meet_zero_copy(listen: &EpHalfConfig, remote: &EpHalfConfig) -> bool {
 }
 
 pub async fn run(eps: Vec<EndpointConfig>) {
+    let mut count: usize = 0;
     let mut workers: Vec<JoinHandle<io::Result<()>>> =
         Vec::with_capacity(eps.len());
     for ep in eps.into_iter() {
+        debug!("load next endpoint");
         // convert into full config
         let EndpointConfig { listen, remote } = ep;
         let listen: EpHalfConfig = listen.into();
@@ -44,6 +47,10 @@ pub async fn run(eps: Vec<EndpointConfig>) {
 
         // load transport config and create task
         net::spawn_with_net(&mut workers, &listen, &remote);
+        count += 1;
+        info!("new endpoint inited[{}]", count);
     }
+    warn!("altogether {} endpoints", count);
+    warn!("service start");
     join_all(workers).await;
 }

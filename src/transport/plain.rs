@@ -210,20 +210,9 @@ pub struct Connector {
 
 impl Connector {
     pub fn new(addr: CommonAddr) -> Self { Connector { addr } }
-}
-
-#[async_trait]
-impl AsyncConnect for Connector {
-    const TRANS: Transport = Transport::TCP;
-
-    const SCHEME: &'static str = "tcp";
-
-    type IO = PlainStream;
 
     #[inline]
-    fn addr(&self) -> &CommonAddr { &self.addr }
-
-    async fn connect(&self) -> io::Result<Self::IO> {
+    pub async fn connect_plain(&self) -> io::Result<PlainStream> {
         let stream = match &self.addr {
             CommonAddr::DomainName(addr, port) => {
                 let ip = dns::resolve_async(addr).await?;
@@ -240,6 +229,22 @@ impl AsyncConnect for Connector {
         };
         stream.set_no_delay(true)?;
         Ok(stream)
+    }
+}
+
+#[async_trait]
+impl AsyncConnect for Connector {
+    const TRANS: Transport = Transport::TCP;
+
+    const SCHEME: &'static str = "tcp";
+
+    type IO = PlainStream;
+
+    #[inline]
+    fn addr(&self) -> &CommonAddr { &self.addr }
+
+    async fn connect(&self) -> io::Result<Self::IO> {
+        self.connect_plain().await
     }
 }
 

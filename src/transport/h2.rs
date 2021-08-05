@@ -167,8 +167,8 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     const TRANS: Transport = Transport::H2;
 
     const SCHEME: &'static str = match T::TRANS {
-        Transport::TLS => "https",
-        _ => "http",
+        Transport::TLS => "h2",
+        _ => "h2c",
     };
 
     type IO = H2Stream;
@@ -300,8 +300,8 @@ where
     const TRANS: Transport = Transport::H2;
 
     const SCHEME: &'static str = match L::TRANS {
-        Transport::TLS => "https",
-        _ => "http",
+        Transport::TLS => "h2",
+        _ => "h2c",
     };
 
     type IO = H2Stream;
@@ -348,8 +348,8 @@ where
     const TRANS: Transport = Transport::H2;
 
     const SCHEME: &'static str = match L::TRANS {
-        Transport::TLS => "https",
-        _ => "http",
+        Transport::TLS => "h2",
+        _ => "h2c",
     };
 
     type IO = H2Stream;

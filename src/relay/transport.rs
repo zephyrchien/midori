@@ -1,6 +1,7 @@
 use std::io;
 use std::sync::Arc;
 
+use log::debug;
 use tokio::task::JoinHandle;
 
 use crate::io::proxy;
@@ -21,6 +22,7 @@ fn spawn_lis_half_with_trans<L, C>(
     C: AsyncConnect + 'static,
 {
     use TransportConfig::*;
+    debug!("load listen transport[{}]", lis_trans);
     match lis_trans {
         // quic does not need extra configuration
         Plain => {
@@ -63,6 +65,7 @@ fn spawn_conn_half_with_trans<L, C>(
     C: AsyncConnect + 'static,
 {
     use TransportConfig::*;
+    debug!("load remote transport[{}]", conn_trans);
     match conn_trans {
         // quic does not need extra configuration
         Plain | QUIC(_) => {
@@ -95,6 +98,10 @@ fn spawn_with_tls<L, C>(
 {
     use TLSConfig::*;
     use TransportConfig::QUIC;
+
+    debug!("load listen tls[{}]", &listen.tls);
+    debug!("load remote tls[{}]", &remote.tls);
+
     match &listen.tls {
         Server(lisc) if !matches!(listen.trans, QUIC(_)) => match &remote.tls {
             Client(connc) => spawn_conn_half_with_trans(

@@ -1,5 +1,5 @@
 use std::sync::Arc;
-
+use std::fmt::{Display, Formatter};
 use serde::{Serialize, Deserialize};
 
 use super::WithTransport;
@@ -20,6 +20,19 @@ impl Default for TransportConfig {
     fn default() -> Self { Self::Plain }
 }
 
+impl Display for TransportConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use TransportConfig::*;
+        match self {
+            Plain => write!(f, "raw"),
+            WS(_) => write!(f, "ws"),
+            H2(_) => write!(f, "h2"),
+            QUIC(_) => write!(f, "quic"),
+        }
+    }
+}
+
+// ===== Details =====
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WebSocketConfig {
     pub path: String,
@@ -41,6 +54,7 @@ pub struct QuicConfig {
     pub mux: usize,
 }
 
+// ===== Loaders =====
 impl<L, C> WithTransport<L, C> for WebSocketConfig
 where
     L: AsyncAccept,

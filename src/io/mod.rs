@@ -2,39 +2,52 @@ use std::io;
 use std::sync::Arc;
 use futures::try_join;
 
+use log::{warn, info};
 use tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::{AsyncConnect, AsyncAccept};
 
 mod copy;
 pub use copy::copy;
 
-pub async fn bidi_copy<L, C>(
-    base: L::Base,
-    lis: Arc<L>,
-    conn: Arc<C>,
-) -> io::Result<()>
+pub async fn bidi_copy<L, C>(base: L::Base, lis: Arc<L>, conn: Arc<C>)
 where
     L: AsyncAccept,
     C: AsyncConnect,
 {
-    let (sin, sout) = try_join!(lis.accept(base), conn.connect())?;
+    let (sin, sout) = match try_join!(lis.accept(base), conn.connect()) {
+        Ok((sin, sout)) => (sin, sout),
+        Err(e) => {
+            warn!("protocol level handshake error: {}", e);
+            return;
+        }
+    };
     let (ri, wi) = tokio::io::split(sin);
     let (ro, wo) = tokio::io::split(sout);
-    let _ = try_join!(copy(ri, wo), copy(ro, wi));
-    Ok(())
+    let res = try_join!(copy(ri, wo), copy(ro, wi));
+    if let Err(e) = res {
+        warn!("forwarding finished, {}", e);
+    }
 }
 
 // this is only used by protocols that impl multiplex
-pub async fn bidi_copy_with_stream<C, S>(cc: Arc<C>, sin: S) -> io::Result<()>
+pub async fn bidi_copy_with_stream<C, S>(cc: Arc<C>, sin: S)
 where
     C: AsyncConnect + 'static,
     S: AsyncRead + AsyncWrite,
 {
-    let sout = cc.connect().await?;
+    let sout = match cc.connect().await {
+        Ok(sout) => sout,
+        Err(e) => {
+            warn!("protocol level handshake error: {}", e);
+            return;
+        }
+    };
     let (ri, wi) = tokio::io::split(sin);
     let (ro, wo) = tokio::io::split(sout);
-    let _ = try_join!(copy(ri, wo), copy(ro, wi));
-    Ok(())
+    let res = try_join!(copy(ri, wo), copy(ro, wi));
+    if let Err(e) = res {
+        warn!("forwarding finished, {}", e);
+    }
 }
 
 pub async fn proxy<L, C>(lis: Arc<L>, conn: Arc<C>) -> io::Result<()>
@@ -43,8 +56,18 @@ where
     C: AsyncConnect + 'static,
 {
     loop {
-        if let Ok((base, _)) = lis.accept_base().await {
-            tokio::spawn(bidi_copy(base, lis.clone(), conn.clone()));
+        match lis.accept_base().await {
+            Ok((base, addr)) => {
+                info!(
+                    "{}[{}] ⇋ {}[{}]",
+                    &addr,
+                    L::SCHEME,
+                    conn.addr(),
+                    C::SCHEME
+                );
+                tokio::spawn(bidi_copy(base, lis.clone(), conn.clone()));
+            }
+            Err(e) => warn!("failed to accept[{}]: {}", L::SCHEME, e),
         }
     }
 }
@@ -61,14 +84,21 @@ pub mod linux_ext {
     pub async fn bidi_zero_copy(
         mut sin: plain::PlainStream,
         conn: plain::Connector,
-    ) -> io::Result<()> {
-        let mut sout = conn.connect().await?;
+    ) {
+        let mut sout = match conn.connect_plain().await {
+            Ok(sout) => sout,
+            Err(e) => {
+                warn!("protocol level handshake error: {}", e);
+                return;
+            }
+        };
         let (ri, wi) = plain::linux_ext::split(&mut sin);
         let (ro, wo) = plain::linux_ext::split(&mut sout);
 
-        let _ = try_join!(zero_copy(ri, wo), zero_copy(ro, wi));
-
-        Ok(())
+        let res = try_join!(zero_copy(ri, wo), zero_copy(ro, wi));
+        if let Err(e) = res {
+            warn!("forwarding finished, {}", e);
+        }
     }
 
     pub async fn splice(
@@ -77,8 +107,12 @@ pub mod linux_ext {
     ) -> io::Result<()> {
         let plain_lis = lis.inner();
         loop {
-            if let Ok((sin, _)) = plain_lis.accept_plain().await {
-                tokio::spawn(bidi_zero_copy(sin, conn.clone()));
+            match plain_lis.accept_plain().await {
+                Ok((sin, addr)) => {
+                    info!("{}[raw] ⇋ {}[raw]", &addr, conn.addr());
+                    tokio::spawn(bidi_zero_copy(sin, conn.clone()));
+                }
+                Err(e) => warn!("failed to accept[raw]: {}", e),
             }
         }
     }
