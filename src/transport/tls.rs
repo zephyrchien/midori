@@ -2,6 +2,7 @@ use std::io::Result;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use log::debug;
 use async_trait::async_trait;
 use webpki::DNSName;
 use rustls::{ClientConfig, ServerConfig};
@@ -44,6 +45,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     #[inline]
     async fn connect(&self) -> Result<Self::IO> {
         let stream = self.cc.connect().await?;
+        debug!("tls connect ->");
         self.tls.connect(self.sni.as_ref(), stream).await
     }
 }
@@ -84,6 +86,7 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
     #[inline]
     async fn accept(&self, base: Self::Base) -> Result<Self::IO> {
         let stream = self.lis.accept(base).await?;
+        debug!("tls accept <-");
         Ok(self.tls.accept(stream).await?)
     }
 }

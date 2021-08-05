@@ -7,6 +7,7 @@ use futures::ready;
 use futures::sink::Sink;
 use futures::stream::Stream;
 
+use log::debug;
 use bytes::BytesMut;
 use http::{Uri, StatusCode};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -172,6 +173,7 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     #[inline]
     async fn connect(&self) -> Result<Self::IO> {
         let stream = self.cc.connect().await?;
+        debug!("ws connect ->");
         tokio_tungstenite::client_async_with_config(
             &self.uri,
             stream,
@@ -214,8 +216,10 @@ impl Callback for RequestHook {
         response: Response,
     ) -> std::result::Result<Response, ErrorResponse> {
         if request.uri().path() == self.path {
+            debug!("check request path -- ok");
             Ok(response)
         } else {
+            debug!("check request path -- not found");
             let mut response = ErrorResponse::new(None);
             *response.status_mut() = StatusCode::NOT_FOUND;
             Err(response)
@@ -247,6 +251,8 @@ impl<T: AsyncAccept> AsyncAccept for Acceptor<T> {
     #[inline]
     async fn accept(&self, base: Self::Base) -> Result<Self::IO> {
         let stream = self.lis.accept(base).await?;
+        debug!("ws accept <-");
+
         let hook = RequestHook {
             path: self.path.clone(),
         };

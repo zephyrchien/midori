@@ -59,7 +59,7 @@ where
         match lis.accept_base().await {
             Ok((base, addr)) => {
                 info!(
-                    "{}[{}] ⇋ {}[{}]",
+                    "{}[{}] <-> {}[{}]",
                     &addr,
                     L::SCHEME,
                     conn.addr(),
@@ -109,7 +109,7 @@ pub mod linux_ext {
         loop {
             match plain_lis.accept_plain().await {
                 Ok((sin, addr)) => {
-                    info!("{}[raw] ⇋ {}[raw]", &addr, conn.addr());
+                    info!("{}[raw] <-> {}[raw]", &addr, conn.addr());
                     tokio::spawn(bidi_zero_copy(sin, conn.clone()));
                 }
                 Err(e) => warn!("failed to accept[raw]: {}", e),

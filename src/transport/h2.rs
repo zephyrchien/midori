@@ -7,6 +7,7 @@ use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use futures::ready;
 
+use log::{debug, info, warn};
 use bytes::{Bytes, BytesMut};
 use http::{Uri, Version, StatusCode, Request, Response};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -240,7 +241,9 @@ async fn new_client<T: AsyncConnect>(
     // reuse existed connection
     let channel = (*cc.channel.read().unwrap()).clone();
     if let Some(channel) = channel {
-        if cc.count.load(Ordering::Relaxed) < cc.max_concurrent {
+        let count = cc.count.load(Ordering::Relaxed);
+        if count < cc.max_concurrent {
+            debug!("h2 connect[reuse {}] ->", count);
             if let Ok(client) = channel.ready().await {
                 cc.count.fetch_add(1, Ordering::Relaxed);
                 return Ok(client);
@@ -250,6 +253,8 @@ async fn new_client<T: AsyncConnect>(
 
     // establish a new connection
     let stream = cc.cc.connect().await?;
+    debug!("h2 connect[new] ->");
+
     let (client, conn) = client::Builder::new()
         .enable_push(cc.allow_push)
         .handshake(stream)
@@ -319,6 +324,7 @@ where
     #[inline]
     async fn accept(&self, base: Self::Base) -> Result<Self::IO> {
         let stream = self.lis.accept(base).await?;
+        debug!("h2 accept[new] <-");
         // establish a new connection
         let mut conn = server::handshake(stream)
             .await
@@ -367,6 +373,7 @@ where
     #[inline]
     async fn accept(&self, base: Self::Base) -> Result<Self::IO> {
         let stream = self.lis.accept(base).await?;
+        debug!("h2 accept[new] <-");
         // establish a new connection
         let mut conn = server::handshake(stream)
             .await
@@ -396,6 +403,7 @@ async fn handle_request(
 ) -> Result<H2Stream> {
     // check request path
     if request.uri().path() != path {
+        debug!("check request path -- not found");
         let _ = response.send_response(
             Response::builder()
                 .status(StatusCode::NOT_FOUND)
@@ -405,6 +413,7 @@ async fn handle_request(
         );
         return Err(Error::new(ErrorKind::NotFound, "invalid path"));
     }
+    debug!("check request path -- ok");
 
     // get recv stream from request body
     let (_, recv) = request.into_parts();
@@ -464,9 +473,34 @@ async fn handle_mux_conn<C, IO>(
     IO: AsyncRead + AsyncWrite + Unpin,
 {
     use crate::io::bidi_copy_with_stream;
+    loop {
+        match conn.accept().await {
+            Some(x) => match x {
+                Ok((request, response)) => handle_request(
+                    &path, request, response,
+                )
+                .await
+                .map_or_else(
+                    |e| debug!("failed to resolve h2-mux stream, {}", e),
+                    |stream| {
+                        info!(
+                            "new h2 stream[reuse] <-> {}[{}]",
+                            cc.addr(),
+                            C::SCHEME
+                        );
+                        tokio::spawn(bidi_copy_with_stream(cc.clone(), stream));
+                    },
+                ),
+                Err(e) => warn!("failed to recv h2-mux response, {}", e),
+            },
+            None => warn!("no more h2-mux stream"),
+        }
+    }
+    /*
     while let Some(Ok((request, response))) = conn.accept().await {
+
         if let Ok(stream) = handle_request(&path, request, response).await {
             tokio::spawn(bidi_copy_with_stream(cc.clone(), stream));
         }
-    }
+    }*/
 }

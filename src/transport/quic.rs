@@ -6,6 +6,7 @@ use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use futures::StreamExt;
 
+use log::{warn, info, debug};
 use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite};
 use quinn::crypto::rustls::TlsSession;
@@ -126,7 +127,9 @@ async fn new_client(cc: &Connector) -> Result<Connection<TlsSession>> {
     // reuse existed connection
     let channel = (*cc.channel.read().unwrap()).clone();
     if let Some(client) = channel {
-        if cc.count.load(Ordering::Relaxed) < cc.max_concurrent {
+        let count = cc.count.load(Ordering::Relaxed);
+        if count < cc.max_concurrent {
+            debug!("quic connect[reuse {}] -> {}", count, &cc.addr);
             cc.count.fetch_add(1, Ordering::Relaxed);
             return Ok(client);
         };
@@ -143,6 +146,7 @@ async fn new_client(cc: &Connector) -> Result<Connection<TlsSession>> {
         CommonAddr::UnixSocketPath(_) => unreachable!(),
     };
 
+    debug!("quic connect[new] -> {}", &cc.addr);
     let connecting = cc
         .cc
         .connect(&connect_addr, &cc.sni)
@@ -213,6 +217,8 @@ impl AsyncAccept for Acceptor<()> {
             ..
         } = new_conn;
 
+        debug!("quic accept[new] <- {}", &x.remote_address());
+
         let (send, recv) = bi_streams.next().await.ok_or_else(|| {
             Error::new(ErrorKind::Interrupted, "no more stream")
         })??;
@@ -258,6 +264,8 @@ where
             ..
         } = new_conn;
 
+        debug!("quic accept[new] <- {}", &x.remote_address());
+
         let (send, recv) = bi_streams.next().await.ok_or_else(|| {
             Error::new(ErrorKind::Interrupted, "no more stream")
         })??;
@@ -274,15 +282,37 @@ where
     C: AsyncConnect + 'static,
 {
     use crate::io::bidi_copy_with_stream;
+
+    loop {
+        match bi_streams.next().await {
+            Some(x) => match x {
+                Ok((send, recv)) => {
+                    info!(
+                        "new quic stream[reuse] ⇋ {}[{}]",
+                        cc.addr(),
+                        C::SCHEME
+                    );
+                    tokio::spawn(bidi_copy_with_stream(
+                        cc.clone(),
+                        QuicStream::new(send, recv),
+                    ));
+                }
+                Err(e) => warn!("failed to resolve quic-mux stream, {}", e),
+            },
+            None => warn!("no more quic-mux stream"),
+        }
+    }
+    /*
     while let Some(Ok((send, recv))) = bi_streams.next().await {
         tokio::spawn(bidi_copy_with_stream(
             cc.clone(),
             QuicStream::new(send, recv),
         ));
     }
+    */
 }
 
-// Acceptor
+// Raw Acceptor, used to setup the Quic Acceptor above
 pub struct RawAcceptor {
     lis: Incoming,
     addr: CommonAddr,

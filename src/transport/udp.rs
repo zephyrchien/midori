@@ -5,6 +5,7 @@ use std::task::{Poll, Context};
 use std::net::SocketAddr;
 use futures::ready;
 
+use log::debug;
 use bytes::BytesMut;
 use socket2::{Socket, Type, Domain, SockAddr};
 use tokio::net::UdpSocket;
@@ -163,6 +164,7 @@ impl AsyncConnect for Connector {
         } else {
             utils::empty_sockaddr_v6()
         };
+        debug!("udp connect {} -> {}", &bind_addr, &connect_addr);
         let socket = UdpSocket::bind(&bind_addr).await?;
         Ok(UdpStream::new(socket, Client(connect_addr)))
     }
@@ -202,6 +204,7 @@ impl AsyncAccept for Acceptor {
         };
         let socket = new_udp_socket(bind_addr)?;
         let (_, connect_addr) = socket.recv_from(&mut buffer).await?;
+        debug!("udp accept {} <- {}", &bind_addr, &connect_addr);
         socket.connect(&connect_addr).await?;
         Ok((UdpStream::new(socket, Server {}), connect_addr))
     }

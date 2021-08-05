@@ -4,6 +4,7 @@ use std::task::{Context, Poll};
 use std::net::SocketAddr;
 use futures::executor::block_on;
 
+use log::debug;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpStream, TcpListener};
 use async_trait::async_trait;
@@ -217,13 +218,16 @@ impl Connector {
             CommonAddr::DomainName(addr, port) => {
                 let ip = dns::resolve_async(addr).await?;
                 let sockaddr = SocketAddr::new(ip, *port);
+                debug!("tcp connect -> {}", &sockaddr);
                 PlainStream::TCP(TcpStream::connect(sockaddr).await?)
             }
             CommonAddr::SocketAddr(sockaddr) => {
+                debug!("tcp connect -> {}", sockaddr);
                 PlainStream::TCP(TcpStream::connect(sockaddr).await?)
             }
             #[cfg(unix)]
             CommonAddr::UnixSocketPath(path) => {
+                debug!("uds connect -> {:?}", path);
                 PlainStream::UDS(UnixStream::connect(path).await?)
             }
         };
@@ -273,12 +277,14 @@ impl PlainListener {
         Ok(match self {
             PlainListener::TCP(x) => {
                 let (stream, sockaddr) = x.accept().await?;
+                debug!("tcp accept <- {}", &sockaddr);
                 stream.set_nodelay(true)?;
                 (PlainStream::TCP(stream), sockaddr)
             }
             #[cfg(unix)]
             PlainListener::UDS(x) => {
-                let (stream, _) = x.accept().await?;
+                let (stream, path) = x.accept().await?;
+                debug!("uds accept <- {:?}", path);
                 let sockaddr = utils::empty_sockaddr_v4();
                 (PlainStream::UDS(stream), sockaddr)
             }
