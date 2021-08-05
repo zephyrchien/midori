@@ -56,9 +56,7 @@ OPTIONS:
 ```
 
 ## Quick Start
-Get started with a simple TCP relay(supports zero-copy on linux).
-
-You need to create a config file and then specify the listen and remote address.
+Let's start with a simple TCP relay(supports zero-copy on linux). Just create a config file and then specify the listen and remote address:
 
 ```json
 {
@@ -81,6 +79,22 @@ midori -c config.json
 ```
 
 Note: Almost all kinds of address are supported, including `ipv4`, `ipv6`, `domain name` and `unix socket path`.
+
+## Log
+This program is equipped with a light-weight logger, which only prints output to the screen and is disable by default. You can provide env variables to enable it.
+
+Supported log levels:
+- Off
+- Error
+- Warn
+- Info
+- Debug
+- Trace
+
+Example:
+```shell
+RUST_LOG=debug midori
+```
 
 ## Full Configuration
 <details>
