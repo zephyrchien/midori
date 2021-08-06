@@ -1,14 +1,14 @@
 use std::fmt::{self, Display, Formatter};
 use std::net::SocketAddr;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "uds"))]
 use std::path::PathBuf;
 
 #[derive(Clone)]
 pub enum CommonAddr {
     SocketAddr(SocketAddr),
     DomainName(String, u16),
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "uds"))]
     UnixSocketPath(PathBuf),
 }
 
@@ -17,7 +17,7 @@ impl Display for CommonAddr {
         match self {
             Self::SocketAddr(sockaddr) => write!(f, "{}", sockaddr),
             Self::DomainName(addr, port) => write!(f, "{}:{}", addr, port),
-            #[cfg(unix)]
+            #[cfg(all(unix, feature = "uds"))]
             Self::UnixSocketPath(path) => write!(f, "{}", path.display()),
         }
     }
@@ -32,13 +32,17 @@ impl CommonAddr {
     }
 }
 
+#[cfg(feature = "quic")]
 use crate::transport::quic;
+
 pub enum MaybeQuic<L> {
+    #[cfg(feature = "quic")]
     Quic(quic::RawAcceptor),
     Other(L),
 }
 
 impl<L> MaybeQuic<L> {
+    #[cfg(feature = "quic")]
     pub fn take_quic(self) -> Option<quic::RawAcceptor> {
         match self {
             Self::Quic(x) => Some(x),

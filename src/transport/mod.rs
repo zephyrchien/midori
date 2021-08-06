@@ -5,10 +5,20 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use crate::utils::CommonAddr;
 
 pub mod plain;
+
+#[cfg(feature = "ws")]
 pub mod ws;
+
+#[cfg(feature = "h2")]
 pub mod h2;
+
+#[cfg(feature = "tls")]
 pub mod tls;
+
+#[cfg(feature = "udp")]
 pub mod udp;
+
+#[cfg(feature = "quic")]
 pub mod quic;
 
 trait IOStream: AsyncRead + AsyncWrite + Send + Sync + Unpin {}

@@ -1,10 +1,16 @@
 use std::fs::File;
 use std::io::BufReader;
 
-use rustls::{Certificate, PrivateKey};
+use lazy_static::lazy_static;
+use rustls::{Certificate, PrivateKey, RootCertStore};
 use rustls::internal::pemfile;
 
 use crate::error::cert::{CertError, Result};
+
+lazy_static! {
+    pub static ref NATIVE_CERTS: RootCertStore =
+        rustls_native_certs::load_native_certs().unwrap();
+}
 
 pub fn generate_cert_key(
     common_name: &str,

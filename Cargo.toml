@@ -1,38 +1,70 @@
 [package]
 edition = "2018"
 name = "midori"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["zephyr <i@zephyr.moe>"]
 license = "MIT"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.release]
+opt-level = 3
+lto = true
+
+[profile.dev]
+opt-level = 0
+
+[features]
+default = ["full"]
+full = ["uds", "tls", "ws", "h2c", "udp", "quic"]
+uds = []
+tls = ["rustls", "tokio-rustls", "webpki", "webpki-roots", "rcgen", "rustls-native-certs"]
+ws = ["tokio-tungstenite", "http"]
+h2c = ["h2", "http"]
+udp = ["socket2"]
+quic = ["tls", "quinn"]
 
 [dependencies]
+# common
 libc = "0.2"
-http = "0.2"
+http = { version = "0.2", optional = true}
 bytes = "1"
-socket2 = "0.4"
+socket2 = { version = "0.4", optional = true}
 futures = "0.3"
 lazy_static = "1"
 async-trait = "0.1"
 
-log = "0.4"
-env_logger = "0.9"
-clap = "2"
+# ci
 clippy = "*"
+
+# cmd
+clap = "2"
+
+# serialize
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-base64 = "0.13"
-rustls = { version = "0.19", features = ["dangerous_configuration", "quic"] }
-rcgen = "0.8"
-webpki = "0.21"
-webpki-roots = "0.21"
-rustls-native-certs = { version = "0.5", features = ["rustls"] }
 
+# log
+log = "0.4"
+env_logger = "0.9"
 
-tokio = { version = "1.9", features = ["full"] }
+# rt
+tokio = { version = "1.9", features = ["rt", "rt-multi-thread", "io-util", "net"] }
+
+# dns
 trust-dns-resolver = "0.20"
-tokio-rustls = "0.22"
-tokio-tungstenite = "0.15"
-h2 = "0.3"
-quinn = "0.7"
+
+# tls
+rcgen = { version = "0.8", optional = true }
+webpki = { version = "0.21", optional = true }
+webpki-roots = { version = "0.21", optional = true }
+rustls-native-certs = { version = "0.5", features = ["rustls"] , optional = true }
+tokio-rustls = { version = "0.22", optional = true }
+rustls = { version = "0.19", features = ["dangerous_configuration", "quic"] , optional = true }
+
+# ws
+tokio-tungstenite = { version = "0.15", optional = true }
+
+# h2
+h2 = { version = "0.3", optional = true }
+
+# quic
+quinn = { version = "0.7", default-features = false, features = ["tls-rustls"], optional = true }

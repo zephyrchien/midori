@@ -15,7 +15,9 @@ use crate::transport::{AsyncConnect, AsyncAccept};
 #[serde(untagged)]
 pub enum TLSConfig {
     None,
+    #[cfg(feature = "tls")]
     Client(TLSClientConfig),
+    #[cfg(feature = "tls")]
     Server(TLSServerConfig),
 }
 
@@ -28,18 +30,23 @@ impl Display for TLSConfig {
         use TLSConfig::*;
         match self {
             None => write!(f, "none"),
+            #[cfg(feature = "tls")]
             Client(_) => write!(f, "rustls"),
+            #[cfg(feature = "tls")]
             Server(_) => write!(f, "rustls"),
         }
     }
 }
 
 // create default values
+#[cfg(feature = "tls")]
 fn def_true() -> bool { true }
 
+#[cfg(feature = "tls")]
 fn def_roots_str() -> String { "firefox".to_string() }
 
 // TLS Client
+#[cfg(feature = "tls")]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TLSClientConfig {
     pub skip_verify: bool,
@@ -65,7 +72,9 @@ pub struct TLSClientConfig {
     pub roots: String,
 }
 
+#[cfg(feature = "tls")]
 struct ClientSkipVerify;
+#[cfg(feature = "tls")]
 impl rustls::ServerCertVerifier for ClientSkipVerify {
     fn verify_server_cert(
         &self,
@@ -78,6 +87,7 @@ impl rustls::ServerCertVerifier for ClientSkipVerify {
     }
 }
 
+#[cfg(feature = "tls")]
 impl TLSClientConfig {
     pub fn to_tls(&self) -> ClientConfig { make_client_config(self) }
 
@@ -105,6 +115,7 @@ impl TLSClientConfig {
     }
 }
 
+#[cfg(feature = "tls")]
 fn make_client_config(config: &TLSClientConfig) -> ClientConfig {
     let mut tlsc = ClientConfig::new();
     tlsc.enable_sni = config.enable_sni;
@@ -154,6 +165,7 @@ fn make_client_config(config: &TLSClientConfig) -> ClientConfig {
 }
 
 // TLS Server
+#[cfg(feature = "tls")]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TLSServerConfig {
     pub cert: String,
@@ -170,8 +182,10 @@ pub struct TLSServerConfig {
     pub ocsp: String,
 }
 
+#[cfg(all(feature = "tls", feature = "quic"))]
 use crate::utils::MaybeQuic;
 
+#[cfg(feature = "tls")]
 impl TLSServerConfig {
     pub fn to_tls(&self) -> ServerConfig { make_server_config(self) }
 
@@ -180,6 +194,7 @@ impl TLSServerConfig {
         tls::Acceptor::new(lis, config)
     }
 
+    #[cfg(feature = "quic")]
     pub fn apply_to_lis_ext<L: AsyncAccept>(
         &self,
         lis: MaybeQuic<L>,
@@ -191,6 +206,7 @@ impl TLSServerConfig {
     }
 }
 
+#[cfg(feature = "tls")]
 fn make_server_config(config: &TLSServerConfig) -> ServerConfig {
     let mut tlsc = ServerConfig::new(NoClientAuth::new());
     // if not specified, use the constructor's default value

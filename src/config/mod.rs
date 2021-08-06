@@ -5,16 +5,16 @@ use serde::{Serialize, Deserialize};
 use crate::utils::must;
 use crate::transport::{AsyncConnect, AsyncAccept};
 
-mod dns;
-mod ep;
-mod net;
-mod tls;
-mod trans;
+pub mod dns;
+pub mod ep;
+pub mod net;
+pub mod tls;
+pub mod trans;
 // re-export
 pub use dns::DnsMode;
 pub use net::NetConfig;
-pub use tls::{TLSConfig, TLSClientConfig, TLSServerConfig};
-pub use trans::{TransportConfig, WebSocketConfig, HTTP2Config};
+pub use tls::TLSConfig;
+pub use trans::TransportConfig;
 pub use ep::{EndpointConfig, EpHalfConfig, MaybeHalfConfig};
 
 #[derive(Debug, Serialize, Deserialize)]

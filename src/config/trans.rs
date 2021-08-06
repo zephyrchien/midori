@@ -11,8 +11,11 @@ use crate::transport::{AsyncConnect, AsyncAccept};
 #[serde(tag = "proto", rename_all = "lowercase")]
 pub enum TransportConfig {
     Plain,
+    #[cfg(feature = "ws")]
     WS(WebSocketConfig),
+    #[cfg(feature = "h2")]
     H2(HTTP2Config),
+    #[cfg(feature = "quic")]
     QUIC(QuicConfig),
 }
 
@@ -25,19 +28,24 @@ impl Display for TransportConfig {
         use TransportConfig::*;
         match self {
             Plain => write!(f, "raw"),
+            #[cfg(feature = "ws")]
             WS(_) => write!(f, "ws"),
+            #[cfg(feature = "h2")]
             H2(_) => write!(f, "h2"),
+            #[cfg(feature = "quic")]
             QUIC(_) => write!(f, "quic"),
         }
     }
 }
 
 // ===== Details =====
+#[cfg(feature = "ws")]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WebSocketConfig {
     pub path: String,
 }
 
+#[cfg(feature = "h2")]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HTTP2Config {
     pub path: String,
@@ -48,6 +56,7 @@ pub struct HTTP2Config {
     pub mux: usize,
 }
 
+#[cfg(feature = "quic")]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QuicConfig {
     #[serde(default)]
@@ -55,6 +64,7 @@ pub struct QuicConfig {
 }
 
 // ===== Loaders =====
+#[cfg(feature = "ws")]
 impl<L, C> WithTransport<L, C> for WebSocketConfig
 where
     L: AsyncAccept,
@@ -76,6 +86,7 @@ where
     }
 }
 
+#[cfg(feature = "h2")]
 impl<L, C> WithTransport<L, C> for HTTP2Config
 where
     L: AsyncAccept,

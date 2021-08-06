@@ -30,6 +30,7 @@ where
 }
 
 // this is only used by protocols that impl multiplex
+#[cfg(any(feature = "h2", feature = "quic"))]
 pub async fn bidi_copy_with_stream<C, S>(cc: Arc<C>, sin: S)
 where
     C: AsyncConnect + 'static,

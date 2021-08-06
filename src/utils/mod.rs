@@ -1,18 +1,19 @@
 use std::net::{SocketAddr, IpAddr, Ipv4Addr, Ipv6Addr};
 
-pub mod types;
-pub mod consts;
-pub mod cert;
 #[macro_use]
 pub mod macros;
-
-pub use consts::*;
-pub use types::{CommonAddr, MaybeQuic};
-pub use cert::{load_certs, load_keys, generate_cert_key};
 pub use must;
 
-#[cfg(target_os = "linux")]
-pub use consts::PIPE_BUF_SIZE;
+pub mod consts;
+pub use consts::*;
+
+pub mod types;
+pub use types::{CommonAddr, MaybeQuic};
+
+#[cfg(feature = "tls")]
+pub mod cert;
+#[cfg(feature = "tls")]
+pub use cert::{load_certs, load_keys, generate_cert_key, NATIVE_CERTS};
 
 #[allow(clippy::mut_from_ref)]
 #[inline]

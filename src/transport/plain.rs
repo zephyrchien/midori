@@ -15,13 +15,13 @@ use crate::utils::{self, CommonAddr};
 
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
-#[cfg(unix)]
+#[cfg(all(unix, feature = "uds"))]
 use tokio::net::{UnixStream, UnixListener};
 
 #[allow(clippy::upper_case_acronyms)]
 pub enum PlainStream {
     TCP(TcpStream),
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "uds"))]
     UDS(UnixStream),
 }
 
@@ -36,7 +36,7 @@ impl AsRawFd for PlainStream {
     fn as_raw_fd(&self) -> RawFd {
         match self {
             Self::TCP(x) => x.as_raw_fd(),
-            #[cfg(unix)]
+            #[cfg(feature = "uds")]
             Self::UDS(x) => x.as_raw_fd(),
         }
     }
@@ -54,7 +54,7 @@ impl PlainStream {
     pub fn set_no_delay(&self, nodelay: bool) -> io::Result<()> {
         match self {
             Self::TCP(x) => x.set_nodelay(nodelay),
-            #[cfg(unix)]
+            #[cfg(all(unix, feature = "uds"))]
             _ => Ok(()),
         }
     }
@@ -79,6 +79,7 @@ pub mod linux_ext {
     ) -> io::Result<R> {
         match x {
             PlainStream::TCP(x) => x.try_io(interest, f),
+            #[cfg(feature = "uds")]
             PlainStream::UDS(x) => x.try_io(interest, f),
         }
     }
@@ -87,6 +88,7 @@ pub mod linux_ext {
     pub async fn readable(x: &PlainStream) -> io::Result<()> {
         match x {
             PlainStream::TCP(x) => x.readable().await,
+            #[cfg(feature = "uds")]
             PlainStream::UDS(x) => x.readable().await,
         }
     }
@@ -95,6 +97,7 @@ pub mod linux_ext {
     pub async fn writable(x: &PlainStream) -> io::Result<()> {
         match x {
             PlainStream::TCP(x) => x.writable().await,
+            #[cfg(feature = "uds")]
             PlainStream::UDS(x) => x.writable().await,
         }
     }
@@ -117,7 +120,7 @@ impl AsyncRead for PlainStream {
     ) -> Poll<io::Result<()>> {
         match &mut self.get_mut() {
             Self::TCP(x) => Pin::new(x).poll_read(cx, buf),
-            #[cfg(unix)]
+            #[cfg(all(unix, feature = "uds"))]
             Self::UDS(x) => Pin::new(x).poll_read(cx, buf),
         }
     }
@@ -144,7 +147,7 @@ impl AsyncWrite for PlainStream {
     ) -> Poll<Result<usize, io::Error>> {
         match &mut self.get_mut() {
             Self::TCP(x) => Pin::new(x).poll_write(cx, buf),
-            #[cfg(unix)]
+            #[cfg(all(unix, feature = "uds"))]
             Self::UDS(x) => Pin::new(x).poll_write(cx, buf),
         }
     }
@@ -156,7 +159,7 @@ impl AsyncWrite for PlainStream {
     ) -> Poll<Result<(), io::Error>> {
         match &mut self.get_mut() {
             Self::TCP(x) => Pin::new(x).poll_flush(cx),
-            #[cfg(unix)]
+            #[cfg(all(unix, feature = "uds"))]
             Self::UDS(x) => Pin::new(x).poll_flush(cx),
         }
     }
@@ -168,7 +171,7 @@ impl AsyncWrite for PlainStream {
     ) -> Poll<Result<(), io::Error>> {
         match &mut self.get_mut() {
             Self::TCP(x) => Pin::new(x).poll_shutdown(cx),
-            #[cfg(unix)]
+            #[cfg(all(unix, feature = "uds"))]
             Self::UDS(x) => Pin::new(x).poll_shutdown(cx),
         }
     }
@@ -224,7 +227,7 @@ impl Connector {
                 debug!("tcp connect -> {}", sockaddr);
                 PlainStream::TCP(TcpStream::connect(sockaddr).await?)
             }
-            #[cfg(unix)]
+            #[cfg(all(unix, feature = "uds"))]
             CommonAddr::UnixSocketPath(path) => {
                 debug!("uds connect -> {:?}", path);
                 PlainStream::UDS(UnixStream::connect(path).await?)
@@ -256,7 +259,7 @@ impl AsyncConnect for Connector {
 #[allow(clippy::upper_case_acronyms)]
 pub enum PlainListener {
     TCP(TcpListener),
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "uds"))]
     UDS(UnixListener),
 }
 
@@ -266,7 +269,7 @@ impl PlainListener {
             CommonAddr::SocketAddr(sockaddr) => {
                 PlainListener::TCP(block_on(TcpListener::bind(sockaddr))?)
             }
-            #[cfg(unix)]
+            #[cfg(all(unix, feature = "uds"))]
             CommonAddr::UnixSocketPath(path) => {
                 PlainListener::UDS(UnixListener::bind(path)?)
             }
@@ -281,7 +284,7 @@ impl PlainListener {
                 stream.set_nodelay(true)?;
                 (PlainStream::TCP(stream), sockaddr)
             }
-            #[cfg(unix)]
+            #[cfg(all(unix, feature = "uds"))]
             PlainListener::UDS(x) => {
                 let (stream, path) = x.accept().await?;
                 debug!("uds accept <- {:?}", path);

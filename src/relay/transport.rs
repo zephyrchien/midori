@@ -6,11 +6,20 @@ use tokio::task::JoinHandle;
 
 use crate::io::proxy;
 use crate::utils::MaybeQuic;
-use crate::config::{
-    EpHalfConfig, HTTP2Config, TLSConfig, TransportConfig, WebSocketConfig,
-    WithTransport,
-};
+use crate::config::{EpHalfConfig, TransportConfig, WithTransport, TLSConfig};
 use crate::transport::{AsyncConnect, AsyncAccept};
+
+// #[cfg(feature = "tls")]
+// use crate::config::tls::{TLSClientConfig, TLSServerConfig};
+
+#[cfg(feature = "ws")]
+use crate::config::trans::WebSocketConfig;
+
+#[cfg(feature = "h2")]
+use crate::config::trans::HTTP2Config;
+
+// #[cfg(feature = "quic")]
+// use crate::config::trans::QuicConfig;
 
 fn spawn_lis_half_with_trans<L, C>(
     workers: &mut Vec<JoinHandle<io::Result<()>>>,
@@ -24,11 +33,11 @@ fn spawn_lis_half_with_trans<L, C>(
     use TransportConfig::*;
     debug!("load listen transport[{}]", lis_trans);
     match lis_trans {
-        // quic does not need extra configuration
         Plain => {
             let lis = lis.take_other().unwrap();
             workers.push(tokio::spawn(proxy(Arc::new(lis), Arc::new(conn))));
         }
+        #[cfg(feature = "ws")]
         WS(lisc) => {
             let lis = <WebSocketConfig as WithTransport<L, C>>::apply_to_lis(
                 lisc,
@@ -36,6 +45,7 @@ fn spawn_lis_half_with_trans<L, C>(
             );
             workers.push(tokio::spawn(proxy(Arc::new(lis), Arc::new(conn))));
         }
+        #[cfg(feature = "h2")]
         H2(lisc) => {
             let conn = Arc::new(conn);
             let lis =
@@ -46,6 +56,7 @@ fn spawn_lis_half_with_trans<L, C>(
                 );
             workers.push(tokio::spawn(proxy(Arc::new(lis), conn)));
         }
+        #[cfg(feature = "quic")]
         QUIC(_) => {
             let conn = Arc::new(conn);
             let lis = lis.take_quic().unwrap().set_connector(conn.clone());
@@ -67,20 +78,26 @@ fn spawn_conn_half_with_trans<L, C>(
     use TransportConfig::*;
     debug!("load remote transport[{}]", conn_trans);
     match conn_trans {
-        // quic does not need extra configuration
-        Plain | QUIC(_) => {
+        Plain => {
             spawn_lis_half_with_trans(workers, lis_trans, lis, conn);
         }
+        #[cfg(feature = "ws")]
         WS(connc) => {
             let conn = <WebSocketConfig as WithTransport<L, C>>::apply_to_conn(
                 connc, conn,
             );
             spawn_lis_half_with_trans(workers, lis_trans, lis, conn);
         }
+        #[cfg(feature = "h2")]
         H2(connc) => {
             let conn = <HTTP2Config as WithTransport<L, C>>::apply_to_conn(
                 connc, conn,
             );
+            spawn_lis_half_with_trans(workers, lis_trans, lis, conn);
+        }
+        // quic does not need extra configuration
+        #[cfg(feature = "quic")]
+        QUIC(_) => {
             spawn_lis_half_with_trans(workers, lis_trans, lis, conn);
         }
     }
@@ -103,6 +120,7 @@ fn spawn_with_tls<L, C>(
     debug!("load remote tls[{}]", &remote.tls);
 
     match &listen.tls {
+        #[cfg(feature = "tls")]
         Server(lisc) if !matches!(listen.trans, QUIC(_)) => match &remote.tls {
             Client(connc) => spawn_conn_half_with_trans(
                 workers,
@@ -120,6 +138,7 @@ fn spawn_with_tls<L, C>(
             ),
         },
         _ => match &remote.tls {
+            #[cfg(feature = "tls")]
             Client(connc) if !matches!(remote.trans, QUIC(_)) => {
                 spawn_conn_half_with_trans(
                     workers,
