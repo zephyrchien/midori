@@ -1,6 +1,6 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::io::{Result, Error, ErrorKind};
+use std::io::Result;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
 
@@ -59,8 +59,9 @@ pub use linux_ext::*;
 
 #[cfg(target_os = "linux")]
 pub mod linux_ext {
-    use tokio::io::Interest;
     use super::*;
+    use std::io::{Error, ErrorKind};
+    use tokio::io::Interest;
 
     #[inline]
     pub fn split(x: &mut PlainStream) -> (ReadHalf, WriteHalf) {

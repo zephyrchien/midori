@@ -9,7 +9,7 @@ use tokio::net::TcpListener;
 use tokio::net::UnixListener;
 
 use super::PlainStream;
-use crate::utils::{self, CommonAddr};
+use crate::utils::CommonAddr;
 use crate::transport::{AsyncAccept, Transport};
 
 #[allow(clippy::upper_case_acronyms)]
@@ -44,7 +44,7 @@ impl PlainListener {
             PlainListener::UDS(x) => {
                 let (stream, path) = x.accept().await?;
                 debug!("uds accept <- {:?}", path);
-                let sockaddr = utils::empty_sockaddr_v4();
+                let sockaddr = crate::utils::empty_sockaddr_v4();
                 (PlainStream::UDS(stream), sockaddr)
             }
         })

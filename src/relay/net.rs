@@ -191,7 +191,7 @@ pub fn spawn_lis_half_with_net<C>(
                 MaybeQuic::Other(new_plain_lis(&listen.addr, &listen.net));
             transport::spawn_with_trans(workers, listen, remote, lis, conn)
         }
-        #[cfg(feature = "uds")]
+        #[cfg(all(unix, feature = "uds"))]
         UDS => {
             let lis =
                 MaybeQuic::Other(new_plain_lis(&listen.addr, &listen.net));
@@ -232,7 +232,7 @@ pub fn spawn_conn_half_with_net(
             let conn = new_plain_conn(&remote.addr, &remote.net);
             spawn_lis_half_with_net(workers, listen, remote, conn)
         }
-        #[cfg(feature = "uds")]
+        #[cfg(all(unix, feature = "uds"))]
         UDS => {
             let conn = new_plain_conn(&remote.addr, &remote.net);
             spawn_lis_half_with_net(workers, listen, remote, conn)
