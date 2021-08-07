@@ -20,7 +20,7 @@ tls = ["rustls", "tokio-rustls", "webpki", "webpki-roots", "rcgen", "rustls-nati
 ws = ["tokio-tungstenite", "http"]
 h2c = ["h2", "http"]
 udp = ["socket2"]
-quic = ["tls", "quinn"]
+quic = ["udp","tls", "quinn"]
 
 [dependencies]
 # common

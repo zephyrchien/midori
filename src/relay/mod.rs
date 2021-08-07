@@ -12,16 +12,12 @@ mod common;
 
 #[cfg(target_os = "linux")]
 pub fn meet_zero_copy(listen: &EpHalfConfig, remote: &EpHalfConfig) -> bool {
-    use crate::config::{NetConfig, TransportConfig};
+    use crate::config::TransportConfig;
     matches!(
-        (&listen.net, &remote.net, &listen.trans, &remote.trans),
-        (
-            NetConfig::TCP | NetConfig::UDS,
-            NetConfig::TCP | NetConfig::UDS,
-            TransportConfig::Plain,
-            TransportConfig::Plain
-        )
-    )
+        (&listen.trans, &remote.trans),
+        (TransportConfig::Plain, TransportConfig::Plain)
+    ) && listen.net.is_zero_copy()
+        && remote.net.is_zero_copy()
 }
 
 pub async fn run(eps: Vec<EndpointConfig>) {

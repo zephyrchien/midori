@@ -9,7 +9,7 @@ pub mod plain;
 #[cfg(feature = "ws")]
 pub mod ws;
 
-#[cfg(feature = "h2")]
+#[cfg(feature = "h2c")]
 pub mod h2;
 
 #[cfg(feature = "tls")]

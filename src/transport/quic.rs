@@ -142,7 +142,7 @@ async fn new_client(cc: &Connector) -> Result<Connection<TlsSession>> {
             let ip = dns::resolve_async(addr).await?;
             SocketAddr::new(ip, *port)
         }
-        #[cfg(unix)]
+        #[cfg(all(unix, feature = "uds"))]
         CommonAddr::UnixSocketPath(_) => unreachable!(),
     };
 

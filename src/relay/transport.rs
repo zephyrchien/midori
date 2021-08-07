@@ -15,7 +15,7 @@ use crate::transport::{AsyncConnect, AsyncAccept};
 #[cfg(feature = "ws")]
 use crate::config::trans::WebSocketConfig;
 
-#[cfg(feature = "h2")]
+#[cfg(feature = "h2c")]
 use crate::config::trans::HTTP2Config;
 
 // #[cfg(feature = "quic")]
@@ -45,7 +45,7 @@ fn spawn_lis_half_with_trans<L, C>(
             );
             workers.push(tokio::spawn(proxy(Arc::new(lis), Arc::new(conn))));
         }
-        #[cfg(feature = "h2")]
+        #[cfg(feature = "h2c")]
         H2(lisc) => {
             let conn = Arc::new(conn);
             let lis =
@@ -88,7 +88,7 @@ fn spawn_conn_half_with_trans<L, C>(
             );
             spawn_lis_half_with_trans(workers, lis_trans, lis, conn);
         }
-        #[cfg(feature = "h2")]
+        #[cfg(feature = "h2c")]
         H2(connc) => {
             let conn = <HTTP2Config as WithTransport<L, C>>::apply_to_conn(
                 connc, conn,
@@ -114,6 +114,7 @@ fn spawn_with_tls<L, C>(
     C: AsyncConnect + 'static,
 {
     use TLSConfig::*;
+    #[cfg(feature = "quic")]
     use TransportConfig::QUIC;
 
     debug!("load listen tls[{}]", &listen.tls);

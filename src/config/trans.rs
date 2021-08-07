@@ -3,7 +3,6 @@ use std::fmt::{Display, Formatter};
 use serde::{Serialize, Deserialize};
 
 use super::WithTransport;
-use crate::transport::{ws, h2};
 use crate::transport::{AsyncConnect, AsyncAccept};
 
 #[allow(clippy::upper_case_acronyms)]
@@ -13,7 +12,7 @@ pub enum TransportConfig {
     Plain,
     #[cfg(feature = "ws")]
     WS(WebSocketConfig),
-    #[cfg(feature = "h2")]
+    #[cfg(feature = "h2c")]
     H2(HTTP2Config),
     #[cfg(feature = "quic")]
     QUIC(QuicConfig),
@@ -30,8 +29,8 @@ impl Display for TransportConfig {
             Plain => write!(f, "raw"),
             #[cfg(feature = "ws")]
             WS(_) => write!(f, "ws"),
-            #[cfg(feature = "h2")]
-            H2(_) => write!(f, "h2"),
+            #[cfg(feature = "h2c")]
+            H2(_) => write!(f, "h2c"),
             #[cfg(feature = "quic")]
             QUIC(_) => write!(f, "quic"),
         }
@@ -45,7 +44,7 @@ pub struct WebSocketConfig {
     pub path: String,
 }
 
-#[cfg(feature = "h2")]
+#[cfg(feature = "h2c")]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HTTP2Config {
     pub path: String,
@@ -64,6 +63,8 @@ pub struct QuicConfig {
 }
 
 // ===== Loaders =====
+#[cfg(feature = "ws")]
+use crate::transport::ws;
 #[cfg(feature = "ws")]
 impl<L, C> WithTransport<L, C> for WebSocketConfig
 where
@@ -86,7 +87,9 @@ where
     }
 }
 
-#[cfg(feature = "h2")]
+#[cfg(feature = "h2c")]
+use crate::transport::h2;
+#[cfg(feature = "h2c")]
 impl<L, C> WithTransport<L, C> for HTTP2Config
 where
     L: AsyncAccept,

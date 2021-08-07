@@ -156,7 +156,7 @@ impl AsyncConnect for Connector {
                 let ip = dns::resolve_async(addr).await?;
                 SocketAddr::new(ip, *port)
             }
-            #[cfg(unix)]
+            #[cfg(all(unix, feature = "uds"))]
             CommonAddr::UnixSocketPath(_) => unreachable!(),
         };
         let bind_addr = if connect_addr.is_ipv4() {
@@ -199,7 +199,7 @@ impl AsyncAccept for Acceptor {
                 let ip = dns::resolve_async(addr).await?;
                 SocketAddr::new(ip, *port)
             }
-            #[cfg(unix)]
+            #[cfg(all(unix, feature = "uds"))]
             CommonAddr::UnixSocketPath(_) => unreachable!(),
         };
         let socket = new_udp_socket(bind_addr)?;

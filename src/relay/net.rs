@@ -6,6 +6,7 @@ use super::common;
 use super::transport;
 use crate::utils::{must, MaybeQuic};
 use crate::config::{EpHalfConfig, NetConfig};
+use crate::transport::AsyncConnect;
 use crate::transport::plain::{self, PlainListener};
 
 // ===== TCP or UDS =====
@@ -170,49 +171,31 @@ pub mod quic_ext {
     }
 }
 
-pub fn spawn_with_net(
+pub fn spawn_lis_half_with_net<C>(
     workers: &mut Vec<JoinHandle<io::Result<()>>>,
     listen: &EpHalfConfig,
     remote: &EpHalfConfig,
-) {
+    conn: C,
+) where
+    C: AsyncConnect + 'static,
+{
     use NetConfig::*;
     #[cfg(feature = "quic")]
-    use crate::config::TransportConfig::*;
+    use crate::config::TransportConfig::QUIC;
 
     debug!("load listen network[{}]", &listen.net);
-    debug!("load remote network[{}]", &remote.net);
 
     match listen.net {
-        TCP | UDS => {
+        TCP => {
             let lis =
                 MaybeQuic::Other(new_plain_lis(&listen.addr, &listen.net));
-            match remote.net {
-                TCP | UDS => {
-                    let conn = new_plain_conn(&remote.addr, &remote.net);
-                    transport::spawn_with_trans(
-                        workers, listen, remote, lis, conn,
-                    )
-                }
-                #[cfg(feature = "quic")]
-                UDP if matches!(remote.trans, QUIC(_)) => {
-                    let conn = new_quic_conn(
-                        &remote.addr,
-                        &remote.net,
-                        &remote.trans,
-                        &remote.tls,
-                    );
-                    transport::spawn_with_trans(
-                        workers, listen, remote, lis, conn,
-                    )
-                }
-                #[cfg(feature = "udp")]
-                UDP => {
-                    let conn = new_udp_conn(&remote.addr, &remote.net);
-                    transport::spawn_with_trans(
-                        workers, listen, remote, lis, conn,
-                    )
-                }
-            }
+            transport::spawn_with_trans(workers, listen, remote, lis, conn)
+        }
+        #[cfg(feature = "uds")]
+        UDS => {
+            let lis =
+                MaybeQuic::Other(new_plain_lis(&listen.addr, &listen.net));
+            transport::spawn_with_trans(workers, listen, remote, lis, conn)
         }
         #[cfg(feature = "quic")]
         UDP if matches!(listen.trans, QUIC(_)) => {
@@ -223,62 +206,59 @@ pub fn spawn_with_net(
                 &listen.trans,
                 &listen.tls,
             ));
-            match remote.net {
-                TCP | UDS => {
-                    let conn = new_plain_conn(&remote.addr, &remote.net);
-                    transport::spawn_with_trans(
-                        workers, listen, remote, lis, conn,
-                    )
-                }
-                UDP if matches!(listen.trans, QUIC(_)) => {
-                    let conn = new_quic_conn(
-                        &remote.addr,
-                        &remote.net,
-                        &remote.trans,
-                        &remote.tls,
-                    );
-                    transport::spawn_with_trans(
-                        workers, listen, remote, lis, conn,
-                    )
-                }
-                #[cfg(feature = "udp")]
-                UDP => {
-                    let conn = new_udp_conn(&remote.addr, &remote.net);
-                    transport::spawn_with_trans(
-                        workers, listen, remote, lis, conn,
-                    )
-                }
-            }
+            transport::spawn_with_trans(workers, listen, remote, lis, conn)
         }
         #[cfg(feature = "udp")]
         UDP => {
             let lis = MaybeQuic::Other(new_udp_lis(&listen.addr, &listen.net));
-            match remote.net {
-                TCP | UDS => {
-                    let conn = new_plain_conn(&remote.addr, &remote.net);
-                    transport::spawn_with_trans(
-                        workers, listen, remote, lis, conn,
-                    )
-                }
-                #[cfg(feature = "quic")]
-                UDP if matches!(listen.trans, QUIC(_)) => {
-                    let conn = new_quic_conn(
-                        &remote.addr,
-                        &remote.net,
-                        &remote.trans,
-                        &remote.tls,
-                    );
-                    transport::spawn_with_trans(
-                        workers, listen, remote, lis, conn,
-                    )
-                }
-                UDP => {
-                    let conn = new_udp_conn(&remote.addr, &remote.net);
-                    transport::spawn_with_trans(
-                        workers, listen, remote, lis, conn,
-                    )
-                }
-            }
+            transport::spawn_with_trans(workers, listen, remote, lis, conn)
         }
     }
+}
+
+pub fn spawn_conn_half_with_net(
+    workers: &mut Vec<JoinHandle<io::Result<()>>>,
+    listen: &EpHalfConfig,
+    remote: &EpHalfConfig,
+) {
+    use NetConfig::*;
+    #[cfg(feature = "quic")]
+    use crate::config::TransportConfig::QUIC;
+
+    debug!("load remote network[{}]", &remote.net);
+
+    match remote.net {
+        TCP => {
+            let conn = new_plain_conn(&remote.addr, &remote.net);
+            spawn_lis_half_with_net(workers, listen, remote, conn)
+        }
+        #[cfg(feature = "uds")]
+        UDS => {
+            let conn = new_plain_conn(&remote.addr, &remote.net);
+            spawn_lis_half_with_net(workers, listen, remote, conn)
+        }
+        #[cfg(feature = "quic")]
+        UDP if matches!(remote.trans, QUIC(_)) => {
+            let conn = new_quic_conn(
+                &remote.addr,
+                &remote.net,
+                &remote.trans,
+                &remote.tls,
+            );
+            spawn_lis_half_with_net(workers, listen, remote, conn)
+        }
+        #[cfg(feature = "udp")]
+        UDP => {
+            let conn = new_udp_conn(&remote.addr, &remote.net);
+            spawn_lis_half_with_net(workers, listen, remote, conn)
+        }
+    }
+}
+
+pub fn spawn_with_net(
+    workers: &mut Vec<JoinHandle<io::Result<()>>>,
+    listen: &EpHalfConfig,
+    remote: &EpHalfConfig,
+) {
+    spawn_conn_half_with_net(workers, listen, remote)
 }
