@@ -43,6 +43,30 @@
 
 [quic-doc-url]: https://github.com/zephyrchien/midori/blob/master/docs/quic.md
 
+## Build
+```shell
+git clone https://github.com/zephyrchien/midori
+cd midori
+cargo build --release
+```
+### Optional Features
+- `uds` -- enable unix domain socket
+- `udp` -- enable udp
+- `tls` -- enable tls(rustls)
+- `ws` -- enable websocket
+- `h2c` -- enable http2
+- `quic` -- enable quic
+- `full` -- enable all above (*default*)
+```shell
+# tcp only
+cargo build --release --no-default-features
+
+# with tls support
+cargo build --release --no-default-features --features tls
+
+# with other protocols
+cargo build --release --no-default-features --features tls,ws,h2c
+```
 ## Usage
 ```shell
 midori [OPTIONS] [SUBCOMMAND]
