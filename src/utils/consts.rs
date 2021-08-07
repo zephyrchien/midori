@@ -1,4 +1,4 @@
-pub const VERSION: &str = "0.5.1";
+pub const VERSION: &str = "0.6.0";
 pub const NAV_VERSION: &str = "0.1.0";
 
 pub const BUF_SIZE: usize = 0x4000;
