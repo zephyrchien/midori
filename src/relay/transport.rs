@@ -117,13 +117,21 @@ fn spawn_with_tls<L, C>(
     #[cfg(feature = "quic")]
     use TransportConfig::QUIC;
 
+    #[cfg(not(feature = "quic"))]
+    let (is_quic_lis, is_quic_conn) = (false, false);
+    #[cfg(feature = "quic")]
+    let (is_quic_lis, is_quic_conn) = (
+        matches!(&listen.trans, QUIC(_)),
+        matches!(&remote.trans, QUIC(_)),
+    );
+
     debug!("load listen tls[{}]", &listen.tls);
     debug!("load remote tls[{}]", &remote.tls);
 
     match &listen.tls {
         #[cfg(feature = "tls")]
-        Server(lisc) if !matches!(listen.trans, QUIC(_)) => match &remote.tls {
-            Client(connc) => spawn_conn_half_with_trans(
+        Server(lisc) if !is_quic_lis => match &remote.tls {
+            Client(connc) if !is_quic_conn => spawn_conn_half_with_trans(
                 workers,
                 &listen.trans,
                 &remote.trans,
@@ -140,15 +148,13 @@ fn spawn_with_tls<L, C>(
         },
         _ => match &remote.tls {
             #[cfg(feature = "tls")]
-            Client(connc) if !matches!(remote.trans, QUIC(_)) => {
-                spawn_conn_half_with_trans(
-                    workers,
-                    &listen.trans,
-                    &remote.trans,
-                    lis,
-                    connc.apply_to_conn(conn),
-                )
-            }
+            Client(connc) if !is_quic_conn => spawn_conn_half_with_trans(
+                workers,
+                &listen.trans,
+                &remote.trans,
+                lis,
+                connc.apply_to_conn(conn),
+            ),
 
             _ => spawn_conn_half_with_trans(
                 workers,

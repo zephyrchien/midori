@@ -185,7 +185,7 @@ pub fn spawn_lis_half_with_net<C>(
 
     debug!("load listen network[{}]", &listen.net);
 
-    match listen.net {
+    match &listen.net {
         TCP => {
             let lis =
                 MaybeQuic::Other(new_plain_lis(&listen.addr, &listen.net));
@@ -227,7 +227,7 @@ pub fn spawn_conn_half_with_net(
 
     debug!("load remote network[{}]", &remote.net);
 
-    match remote.net {
+    match &remote.net {
         TCP => {
             let conn = new_plain_conn(&remote.addr, &remote.net);
             spawn_lis_half_with_net(workers, listen, remote, conn)
@@ -238,7 +238,7 @@ pub fn spawn_conn_half_with_net(
             spawn_lis_half_with_net(workers, listen, remote, conn)
         }
         #[cfg(feature = "quic")]
-        UDP if matches!(remote.trans, QUIC(_)) => {
+        UDP if matches!(&remote.trans, QUIC(_)) => {
             let conn = new_quic_conn(
                 &remote.addr,
                 &remote.net,

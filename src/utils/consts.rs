@@ -6,7 +6,7 @@ pub const NOT_A_DNS_NAME: &str = "localhost";
 
 #[cfg(feature = "ws")]
 pub const WS_BUF_SIZE: usize = 0x1000;
-#[cfg(feature = "h2")]
+#[cfg(feature = "h2c")]
 pub const H2_BUF_SIZE: usize = 0x1000;
 #[cfg(feature = "udp")]
 pub const UDP_BUF_SIZE: usize = 0x1000;

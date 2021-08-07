@@ -44,15 +44,17 @@ pub enum MaybeQuic<L> {
 impl<L> MaybeQuic<L> {
     #[cfg(feature = "quic")]
     pub fn take_quic(self) -> Option<quic::RawAcceptor> {
-        match self {
-            Self::Quic(x) => Some(x),
-            _ => None,
+        if let Self::Quic(x) = self {
+            Some(x)
+        } else {
+            None
         }
     }
     pub fn take_other(self) -> Option<L> {
-        match self {
-            Self::Other(x) => Some(x),
-            _ => None,
+        if let Self::Other(x) = self {
+            Some(x)
+        } else {
+            None
         }
     }
 }
