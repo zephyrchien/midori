@@ -7,7 +7,7 @@ use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use futures::ready;
 
-use log::{debug, info, warn};
+use log::{trace, debug, info, warn};
 use bytes::{Bytes, BytesMut};
 use http::{Uri, Version, StatusCode, Request, Response};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -178,6 +178,9 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     #[inline]
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
 
+    #[inline]
+    fn clear_reuse(&self) { *self.channel.write().unwrap() = None }
+
     async fn connect(&self) -> Result<Self::IO> {
         let mut client = new_client(self).await?;
 
@@ -239,12 +242,14 @@ async fn new_client<T: AsyncConnect>(
     cc: &Connector<T>,
 ) -> Result<SendRequest<Bytes>> {
     // reuse existed connection
+    trace!("h2 init new client");
     let channel = (*cc.channel.read().unwrap()).clone();
     if let Some(channel) = channel {
         let count = cc.count.load(Ordering::Relaxed);
+        trace!("h2 reusable, current mux = {}", count);
         if count < cc.max_concurrent {
-            debug!("h2 connect[reuse {}] ->", count);
             if let Ok(client) = channel.ready().await {
+                debug!("h2 connect[reuse {}] ->", count);
                 cc.count.fetch_add(1, Ordering::Relaxed);
                 return Ok(client);
             };
@@ -489,7 +494,10 @@ async fn handle_mux_conn<C, IO>(
                         tokio::spawn(bidi_copy_with_stream(cc.clone(), stream));
                     },
                 ),
-                Err(e) => warn!("failed to recv h2-mux response, {}", e),
+                Err(e) => {
+                    warn!("failed to recv h2-mux response, {}", e);
+                    return;
+                }
             },
             None => warn!("no more h2-mux stream"),
         }

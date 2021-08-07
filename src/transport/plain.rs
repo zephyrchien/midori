@@ -249,6 +249,8 @@ impl AsyncConnect for Connector {
     #[inline]
     fn addr(&self) -> &CommonAddr { &self.addr }
 
+    fn clear_reuse(&self) {}
+
     #[inline]
     async fn connect(&self) -> io::Result<Self::IO> {
         self.connect_plain().await

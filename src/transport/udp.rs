@@ -149,6 +149,8 @@ impl AsyncConnect for Connector {
     #[inline]
     fn addr(&self) -> &CommonAddr { &self.addr }
 
+    fn clear_reuse(&self) {}
+
     async fn connect(&self) -> io::Result<Self::IO> {
         let connect_addr = match &self.addr {
             CommonAddr::SocketAddr(sockaddr) => *sockaddr,

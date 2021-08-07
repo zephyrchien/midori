@@ -39,6 +39,8 @@ pub trait AsyncConnect: Send + Sync + Unpin {
     const SCHEME: &'static str;
     type IO: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static;
     fn addr(&self) -> &CommonAddr;
+    // only for protocols impl mux
+    fn clear_reuse(&self);
     async fn connect(&self) -> io::Result<Self::IO>;
 }
 

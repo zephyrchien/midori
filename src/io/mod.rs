@@ -25,6 +25,7 @@ where
     let (ro, wo) = tokio::io::split(sout);
     let res = try_join!(copy(ri, wo), copy(ro, wi));
     if let Err(e) = res {
+        conn.clear_reuse();
         warn!("forwarding finished, {}", e);
     }
 }

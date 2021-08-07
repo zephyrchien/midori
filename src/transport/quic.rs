@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use futures::StreamExt;
 
-use log::{warn, info, debug};
+use log::{warn, info, debug, trace};
 use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite};
 use quinn::crypto::rustls::TlsSession;
@@ -116,6 +116,9 @@ impl AsyncConnect for Connector {
     #[inline]
     fn addr(&self) -> &CommonAddr { &self.addr }
 
+    #[inline]
+    fn clear_reuse(&self) { *self.channel.write().unwrap() = None; }
+
     async fn connect(&self) -> Result<Self::IO> {
         let client = new_client(self).await?;
         let (send, recv) = client.open_bi().await?;
@@ -125,9 +128,11 @@ impl AsyncConnect for Connector {
 
 async fn new_client(cc: &Connector) -> Result<Connection<TlsSession>> {
     // reuse existed connection
+    trace!("quic init new client");
     let channel = (*cc.channel.read().unwrap()).clone();
     if let Some(client) = channel {
         let count = cc.count.load(Ordering::Relaxed);
+        trace!("quic reusable, current mux = {}", count);
         if count < cc.max_concurrent {
             debug!("quic connect[reuse {}] -> {}", count, &cc.addr);
             cc.count.fetch_add(1, Ordering::Relaxed);
@@ -288,7 +293,7 @@ where
             Some(x) => match x {
                 Ok((send, recv)) => {
                     info!(
-                        "new quic stream[reuse] ⇋ {}[{}]",
+                        "new quic stream[reuse] <-> {}[{}]",
                         cc.addr(),
                         C::SCHEME
                     );
@@ -297,7 +302,10 @@ where
                         QuicStream::new(send, recv),
                     ));
                 }
-                Err(e) => warn!("failed to resolve quic-mux stream, {}", e),
+                Err(e) => {
+                    warn!("failed to resolve quic-mux stream, {}", e);
+                    return;
+                }
             },
             None => warn!("no more quic-mux stream"),
         }

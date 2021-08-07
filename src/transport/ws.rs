@@ -171,6 +171,8 @@ impl<T: AsyncConnect> AsyncConnect for Connector<T> {
     #[inline]
     fn addr(&self) -> &CommonAddr { self.cc.addr() }
 
+    fn clear_reuse(&self) {}
+
     async fn connect(&self) -> Result<Self::IO> {
         let stream = self.cc.connect().await?;
         debug!("ws connect ->");
