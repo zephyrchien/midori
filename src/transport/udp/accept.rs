@@ -2,7 +2,6 @@ use std::io;
 use std::net::SocketAddr;
 
 use log::debug;
-use bytes::BytesMut;
 use socket2::{Socket, Type, Domain, SockAddr};
 use async_trait::async_trait;
 
@@ -10,7 +9,7 @@ use tokio::net::UdpSocket;
 
 use super::{UdpStream, Server};
 use crate::dns;
-use crate::utils::{CommonAddr, UDP_BUF_SIZE};
+use crate::utils::CommonAddr;
 use crate::transport::{AsyncAccept, Transport};
 
 pub struct Acceptor {
@@ -34,7 +33,6 @@ impl AsyncAccept for Acceptor {
     fn addr(&self) -> &CommonAddr { &self.addr }
 
     async fn accept_base(&self) -> io::Result<(Self::Base, SocketAddr)> {
-        let mut buffer = BytesMut::with_capacity(UDP_BUF_SIZE);
         let bind_addr = match &self.addr {
             CommonAddr::SocketAddr(sockaddr) => *sockaddr,
             CommonAddr::DomainName(addr, port) => {
@@ -45,7 +43,8 @@ impl AsyncAccept for Acceptor {
             CommonAddr::UnixSocketPath(_) => unreachable!(),
         };
         let socket = new_udp_socket(bind_addr)?;
-        let (_, connect_addr) = socket.recv_from(&mut buffer).await?;
+        let mut buffer = [0u8; 0];
+        let (_, connect_addr) = socket.peek_from(&mut buffer).await?;
         debug!("udp accept {} <- {}", &bind_addr, &connect_addr);
         socket.connect(&connect_addr).await?;
         Ok((UdpStream::new(socket, Server {}), connect_addr))
