@@ -19,7 +19,7 @@ uds = []
 tls = ["rustls", "tokio-rustls", "webpki", "webpki-roots", "rcgen", "rustls-native-certs"]
 ws = ["tokio-tungstenite", "http"]
 h2c = ["h2", "http"]
-udp = ["socket2"]
+udp = ["tokio/sync", "tokio/time"]
 quic = ["udp", "tls", "quinn"]
 
 [dependencies]
@@ -27,7 +27,6 @@ quic = ["udp", "tls", "quinn"]
 libc = "0.2"
 http = { version = "0.2", optional = true }
 bytes = "1"
-socket2 = { version = "0.4", optional = true }
 futures = "0.3"
 lazy_static = "1"
 async-trait = "0.1"

@@ -69,6 +69,8 @@ where
                 );
                 tokio::spawn(bidi_copy(base, lis.clone(), conn.clone()));
             }
+            #[cfg(feature = "udp")]
+            Err(ref e) if e.kind() == io::ErrorKind::Other => {}
             Err(e) => warn!("failed to accept[{}]: {}", L::SCHEME, e),
         }
     }

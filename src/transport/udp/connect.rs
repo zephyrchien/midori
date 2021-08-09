@@ -2,12 +2,10 @@ use std::io;
 use std::net::SocketAddr;
 
 use log::debug;
-
 use tokio::net::UdpSocket;
-
 use async_trait::async_trait;
 
-use super::{UdpStream, Client};
+use super::UdpClientStream;
 use crate::transport::{AsyncConnect, Transport};
 use crate::dns;
 use crate::utils::{self, CommonAddr};
@@ -17,7 +15,6 @@ pub struct Connector {
 }
 
 impl Connector {
-    #[inline]
     pub fn new(addr: CommonAddr) -> Self { Connector { addr } }
 }
 
@@ -27,7 +24,7 @@ impl AsyncConnect for Connector {
 
     const SCHEME: &'static str = "udp";
 
-    type IO = UdpStream<Client>;
+    type IO = UdpClientStream;
 
     #[inline]
     fn addr(&self) -> &CommonAddr { &self.addr }
@@ -49,8 +46,8 @@ impl AsyncConnect for Connector {
         } else {
             utils::empty_sockaddr_v6()
         };
-        debug!("udp connect {} -> {}", &bind_addr, &connect_addr);
+        debug!("udp connect -> {}", &connect_addr);
         let socket = UdpSocket::bind(&bind_addr).await?;
-        Ok(UdpStream::new(socket, Client(connect_addr)))
+        Ok(UdpClientStream::new(socket, connect_addr))
     }
 }
