@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use log::{trace,debug};
+use log::{trace, debug};
 use bytes::Bytes;
 use async_trait::async_trait;
 
@@ -52,13 +52,9 @@ impl AsyncAccept for Acceptor {
         let (n, peer_addr) = self.io.recv_from(&mut buffer).await?;
         let mut buffer = Bytes::from(buffer);
         buffer.truncate(n);
+
         // fake accept; send data to channel
-        let send = self
-            .records
-            .read()
-            .unwrap()
-            .get(&peer_addr)
-            .map(|x| x.clone());
+        let send = self.records.read().unwrap().get(&peer_addr).cloned();
         if let Some(send) = send {
             trace!("udp send to channel");
             let _ = send.send(buffer).await;
