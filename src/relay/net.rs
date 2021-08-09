@@ -59,7 +59,10 @@ use udp_ext::*;
 #[cfg(feature = "udp")]
 pub mod udp_ext {
     use super::*;
+    use futures::executor::block_on;
+    use tokio::net::UdpSocket;
     use crate::transport::udp;
+    use crate::utils::CommonAddr::*;
 
     pub fn new_udp_conn(addr: &str, _: &NetConfig) -> udp::Connector {
         let (sockaddr, _) = must!(common::parse_socket_addr(addr, true));
@@ -69,7 +72,13 @@ pub mod udp_ext {
     #[cfg(feature = "udp")]
     pub fn new_udp_lis(addr: &str, _: &NetConfig) -> udp::Acceptor {
         let (sockaddr, _) = must!(common::parse_socket_addr(addr, false));
-        udp::Acceptor::new(sockaddr)
+        let socket = match sockaddr {
+            SocketAddr(sockaddr) => {
+                block_on(UdpSocket::bind(sockaddr)).unwrap()
+            }
+            _ => unreachable!(),
+        };
+        udp::Acceptor::new(socket, sockaddr)
     }
 }
 
