@@ -5,9 +5,9 @@ use crate::error::addr::{Result, AddrError};
 use crate::utils::CommonAddr;
 
 pub fn parse_domain_name(s: &str) -> Option<((String, u16), bool)> {
-    let mut iter = s.splitn(2, ':');
-    let addr = iter.next()?.to_string();
+    let mut iter = s.rsplitn(2, ':');
     let port = iter.next()?.parse::<u16>().ok()?;
+    let addr = iter.next()?.to_string();
     // check addr
     if let Ok(ip) = dns::resolve_sync(&addr) {
         return Some(((addr, port), ip.is_ipv6()));
