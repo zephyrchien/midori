@@ -102,10 +102,10 @@ Launch these 2 endpoints:
 midori -c config.json
 ```
 
-Note: Almost all kinds of address are supported, including `ipv4`, `ipv6`, `domain name` and `unix socket path`.
+Almost all kinds of address are supported, including `ipv4`, `ipv6`, `domain name` and `unix socket path`.
 
 ## Log
-This program is equipped with a light-weight logger, which only prints output to the screen and is disable by default. You can provide env variables to enable it.
+This program is equipped with a light-weight logger, which is disabled by default. You can provide env variables to enable it.
 
 Supported log levels:
 - Off
@@ -204,7 +204,7 @@ Moreover, `trans` and `tls` also support more complicated params(e.g. `path`, `s
 }
 ```
 
-Note that all the protocols can be applied to both sides of `listen` and `remote`. You could either use `net` directly or combine them with `transport`.
+Protocol combinations:
 | net | tcp | uds | udp |
 | :---: | :---: | :---: | :---: |
 | tls | O | O |
