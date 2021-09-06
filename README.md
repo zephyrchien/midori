@@ -184,7 +184,7 @@ The `trust-dns` crate supports these strategies:
 - ipv4_and_ipv6
 
 ### Endpoint(s)
-Each endpoint contains an associated pair of `listen` and `remote`.
+Each endpoint contains an associated pair of `listen` and `remote`:
 ```bash
 {
     "listen": "",
@@ -192,9 +192,8 @@ Each endpoint contains an associated pair of `listen` and `remote`.
 }
 ```
 
-Below is the options of `listen` or `remote`. **Each field has a default value except for `addr`**. <br>
+Options of `listen` & `remote`:
 
-Moreover, `trans` and `tls` also support more complicated params(e.g. `path`, `sni`, `ocsp`..). [See Protocol Docs for more details][doc-url].
 ```bash
 {
     "addr": "",  // must
@@ -203,15 +202,25 @@ Moreover, `trans` and `tls` also support more complicated params(e.g. `path`, `s
     "tls": ""  // none(default)
 }
 ```
+Not all fields above are required. If not specified, the default value will be applied. `trans` and `tls` have more complicated params. [See protocol docs for more details][doc-url].
 
-Protocol combinations:
-| net | tcp | uds | udp |
+You can freely combine `net`, `trans` and `tls`. For example, tcp + ws + tls = wss; uds + h2 + tls = h2(over uds).
+
+All possible combinations:
+| net | tls| trans | result |
 | :---: | :---: | :---: | :---: |
-| tls | O | O |
-| ws | O | O |
-| h2 | O | O |
-| grpc | O | O |
-| quic | | | O |
+| tcp/uds | none   | plain | plain tcp/uds      |
+| tcp/uds | rustls | plain | tls over tcp/uds   |
+| tcp/uds | none   | ws    | ws over tcp/uds    |
+| tcp/uds | rustls | ws    | wss over tcp/uds   |
+| tcp/uds | none   | h2    | h2c over tcp/uds   |
+| tcp/uds | rustls | h2    | http2  over tcp/uds|
+| tcp/uds | none   | grpc  | grpc over tcp/uds  |
+| tcp/uds | rustls | grpc  | grpc over tcp/uds  |
+| udp     | none   | plain | plain udp          |
+| udp     | none   | kcp   | kcp                |
+| udp     | rustls | quic  | quic               |
+
 
 ## License
 [The MIT License (MIT)](https://github.com/zephyrchien/midori/blob/master/LICENSE)
