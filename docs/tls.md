@@ -1,6 +1,6 @@
 # TLS
 
-TLS could be used everywhere.
+The TLS module is powered by Rustls, instead of Openssl.
 
 ## position
 endpoint->listen|remote->tls
