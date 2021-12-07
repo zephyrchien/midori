@@ -31,9 +31,6 @@ futures = "0.3"
 lazy_static = "1"
 async-trait = "0.1"
 
-# ci
-clippy = "*"
-
 # cmd
 clap = "2"
 

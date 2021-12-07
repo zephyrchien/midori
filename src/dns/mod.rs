@@ -1,7 +1,7 @@
 use std::io::{Result, Error, ErrorKind};
 use std::net::IpAddr;
 
-use tokio::runtime::Runtime;
+use futures::executor;
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::config::{ResolverConfig, ResolverOpts, LookupIpStrategy};
 use lazy_static::lazy_static;
@@ -25,8 +25,7 @@ pub fn init_resolver(strategy: LookupIpStrategy) {
 }
 
 pub fn resolve_sync(addr: &str) -> Result<IpAddr> {
-    let rt = Runtime::new().unwrap();
-    rt.block_on(resolve_async(addr))
+    executor::block_on(resolve_async(addr))
 }
 
 pub async fn resolve_async(addr: &str) -> Result<IpAddr> {
