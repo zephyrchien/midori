@@ -43,7 +43,7 @@ log = "0.4"
 env_logger = "0.9"
 
 # rt
-tokio = { version = "1.9", features = ["rt", "rt-multi-thread", "io-util", "net"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net"] }
 
 # dns
 trust-dns-resolver = "0.20"
@@ -57,7 +57,7 @@ tokio-rustls = { version = "0.22", optional = true }
 rustls = { version = "0.19", features = ["dangerous_configuration", "quic"], optional = true }
 
 # ws
-tokio-tungstenite = { version = "0.15", optional = true }
+tokio-tungstenite = { version = "0.16", optional = true }
 
 # h2
 h2 = { version = "0.3", optional = true }
