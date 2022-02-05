@@ -8,7 +8,7 @@ use crate::config::{EndpointConfig, EpHalfConfig};
 
 mod net;
 mod transport;
-mod common;
+pub mod common;
 
 #[cfg(target_os = "linux")]
 pub fn meet_zero_copy(listen: &EpHalfConfig, remote: &EpHalfConfig) -> bool {

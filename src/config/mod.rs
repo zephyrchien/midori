@@ -12,6 +12,7 @@ pub mod tls;
 pub mod trans;
 // re-export
 pub use dns::DnsMode;
+pub use dns::DnsServerConfig;
 pub use net::NetConfig;
 pub use tls::TLSConfig;
 pub use trans::TransportConfig;
@@ -21,6 +22,7 @@ pub use ep::{EndpointConfig, EpHalfConfig, MaybeHalfConfig};
 pub struct GlobalConfig {
     #[serde(default)]
     pub dns_mode: DnsMode,
+    pub dns_servers: Vec<DnsServerConfig>,
     pub endpoints: Vec<EndpointConfig>,
 }
 
