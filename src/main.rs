@@ -31,7 +31,7 @@ fn main() {
 
 fn start_from_config(c: String) {
     let config = GlobalConfig::from_config_file(&c);
-    dns::init_resolver(config.dns_mode.into());
+    dns::init_resolver(config.dns_mode.into(),config.dns_servers);
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()

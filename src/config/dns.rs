@@ -1,5 +1,7 @@
 use serde::{Serialize, Deserialize};
 use trust_dns_resolver::config::LookupIpStrategy;
+use trust_dns_resolver::config::{NameServerConfig,Protocol};
+use std::net::{SocketAddr,IpAddr};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -28,6 +30,44 @@ impl From<DnsMode> for LookupIpStrategy {
             DnsMode::Ipv4AndIpv6 => LookupIpStrategy::Ipv4AndIpv6,
             DnsMode::Ipv4ThenIpv6 => LookupIpStrategy::Ipv4thenIpv6,
             DnsMode::Ipv6ThenIpv4 => LookupIpStrategy::Ipv6thenIpv4,
+        }
+    }
+}
+
+// default values
+fn def_true() -> bool { true }
+fn default_port() -> u16 { 53 }
+fn default_protocol() -> String {String::from("udp")}
+    
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct DnsServerNode {
+    
+    addr: String,
+    
+    #[serde(default = "default_port")]
+    port: u16,
+    
+    #[serde(default = "default_protocol")]
+    protocol: String,
+    
+    #[serde(default = "def_true")]
+    trust_nx_responses: bool
+}
+
+impl From<DnsServerNode> for NameServerConfig {
+    fn from(dns_server_node: DnsServerNode) -> Self {
+        let dns_server_socket = SocketAddr::new(dns_server_node.addr.parse::<IpAddr>().unwrap(), dns_server_node.port);
+        let str_protocol = dns_server_node.protocol.as_str();
+        let dest_protocol = match str_protocol {"tcp" => Protocol::Tcp , _ => Protocol::Udp,};
+        let dest_trust_nx_responses = dns_server_node.trust_nx_responses;
+        NameServerConfig {
+            socket_addr: dns_server_socket,
+            protocol: dest_protocol,
+            tls_dns_name: None,
+            trust_nx_responses: dest_trust_nx_responses,
+            #[cfg(feature = "dns-over-rustls")]
+            tls_config: None,
         }
     }
 }
