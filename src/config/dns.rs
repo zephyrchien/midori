@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use trust_dns_resolver::config::LookupIpStrategy;
-use trust_dns_resolver::config::{NameServerConfig,Protocol};
+use trust_dns_resolver::config::{NameServerConfig, Protocol};
 use std::net::ToSocketAddrs;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -36,27 +36,34 @@ impl From<DnsMode> for LookupIpStrategy {
 
 // default values
 const fn def_true() -> bool { true }
-fn default_protocol() -> String {String::from("udp")}
-    
+fn default_protocol() -> String { String::from("udp") }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct DnsServerNode {
-    
     addr: String,
-    
+
     #[serde(default = "default_protocol")]
     protocol: String,
-    
+
     #[serde(default = "def_true")]
-    trust_nx_responses: bool
+    trust_nx_responses: bool,
 }
 
 impl From<DnsServerNode> for NameServerConfig {
     fn from(dns_server_node: DnsServerNode) -> Self {
-        let dns_server_socket = dns_server_node.addr.to_socket_addrs().unwrap().next().unwrap();
+        let dns_server_socket = dns_server_node
+            .addr
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap();
 
         let str_protocol = dns_server_node.protocol.as_str();
-        let dest_protocol = match str_protocol {"tcp" => Protocol::Tcp , _ => Protocol::Udp,};
+        let dest_protocol = match str_protocol {
+            "tcp" => Protocol::Tcp,
+            _ => Protocol::Udp,
+        };
         let dest_trust_nx_responses = dns_server_node.trust_nx_responses;
         NameServerConfig {
             socket_addr: dns_server_socket,

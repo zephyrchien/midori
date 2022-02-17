@@ -12,7 +12,7 @@ pub mod tls;
 pub mod trans;
 
 // re-export
-pub use self::dns::{DnsMode,DnsServerNode};
+pub use self::dns::{DnsMode, DnsServerNode};
 pub use net::NetConfig;
 pub use tls::TLSConfig;
 pub use trans::TransportConfig;
