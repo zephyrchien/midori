@@ -10,8 +10,9 @@ pub mod ep;
 pub mod net;
 pub mod tls;
 pub mod trans;
+
 // re-export
-pub use dns::DnsMode;
+pub use self::dns::{DnsMode, DnsServerNode};
 pub use net::NetConfig;
 pub use tls::TLSConfig;
 pub use trans::TransportConfig;
@@ -22,6 +23,7 @@ pub struct GlobalConfig {
     #[serde(default)]
     pub dns_mode: DnsMode,
     pub endpoints: Vec<EndpointConfig>,
+    pub dns_servers: Vec<DnsServerNode>,
 }
 
 impl GlobalConfig {
