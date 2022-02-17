@@ -33,7 +33,7 @@ lazy_static! {
 pub fn init_resolver(strategy: LookupIpStrategy,dns_servers: Vec<DnsServerNode>) {
     
     let mut resolver_config = ResolverConfig::new();
-    if dns_servers.len()==0 {
+    if dns_servers.is_empty() {
         resolver_config = ResolverConfig::cloudflare();
     }else{
         for dns_server in dns_servers.into_iter() {

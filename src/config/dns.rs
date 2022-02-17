@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 use trust_dns_resolver::config::LookupIpStrategy;
 use trust_dns_resolver::config::{NameServerConfig,Protocol};
-use std::net::{SocketAddr,ToSocketAddrs};
+use std::net::ToSocketAddrs;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -63,8 +63,6 @@ impl From<DnsServerNode> for NameServerConfig {
             protocol: dest_protocol,
             tls_dns_name: None,
             trust_nx_responses: dest_trust_nx_responses,
-            #[cfg(feature = "dns-over-rustls")]
-            tls_config: None,
         }
     }
 }
